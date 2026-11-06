@@ -98,7 +98,7 @@ export function ResumeImprovement({ initialSession }: { initialSession: Improvem
     <div><p className="eyebrow">Your decisions · separate draft</p><h2 id="improvement-title" className="mt-2 text-xl font-semibold">Improve your resume</h2><p className="mt-3 text-sm leading-7 text-muted-foreground">Compare each recommendation, edit it if needed, and accept only wording you can verify. Nothing is applied automatically. These controls make no additional AI calls.</p></div>
     <Notice>
       <p>The confirmed original below is immutable. The improved draft is separate and stays available if you change the source, review mode, provider preview, or consent above. It still belongs to this original snapshot, not a new review.</p>
-      <p className="mt-2">This workspace is held only in this page’s memory. Download the improved DOCX or copy any text you want to keep before refreshing, closing, or replacing the workspace. No permanent application storage is implemented.</p>
+      <p className="mt-2">This workspace is held only in this page’s memory. Download the improved DOCX or copy any text you want to keep before refreshing, closing, or replacing the workspace. Optional saved summaries do not store or restore this workspace.</p>
       <p className="mt-2">AI wording is limited to conservative removal of leading filler or bullet markers. Other shortening is held back because substring checks alone cannot preserve meaning. If a recommendation needs new facts, supply the specific truthful details yourself or reject it; the application will not invent them.</p>
     </Notice>
     <div className="flex flex-wrap gap-3">

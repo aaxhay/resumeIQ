@@ -34,6 +34,7 @@ export default function ReviewPage() {
               <h2 className="font-semibold">Your text. In your control.</h2>
               <p className="mt-3 text-sm leading-7 text-muted-foreground">Files and pasted text go to this application’s server only when you request extraction. They are processed in memory, without application file storage or AI requests.</p>
               <p className="mt-3 text-sm leading-7 text-muted-foreground">Edits and job descriptions stay in this page’s memory until you request another action. Gemini review sends only your reviewed previews to Google with consent. DOCX export sends the improved resume to this application’s server, not Google. Use Start over or reload to clear the page; this cannot undo a provider transfer or delete a downloaded file.</p>
+              <p className="mt-3 text-sm leading-7 text-muted-foreground">Optional account history saves only a separately previewed and consented summary with limited excerpts for up to 30 days. It does not store your draft. Delete saved summaries from Account; reloading does not delete them.</p>
               <Link href="/#privacy" className="mt-4 inline-block rounded-sm text-sm font-medium text-primary underline underline-offset-4">About your privacy</Link>
             </section>
             <section className="px-1">

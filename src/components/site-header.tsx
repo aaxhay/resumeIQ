@@ -17,6 +17,7 @@ export function SiteHeader({ reviewPage = false }: { reviewPage?: boolean }) {
           <nav aria-label="Main navigation" className="flex items-center gap-5 text-sm font-medium sm:gap-8">
             <Link href="/#how-it-works" className="hidden rounded-sm text-muted-foreground hover:text-primary sm:inline">How it works</Link>
             <Link href="/#privacy" className="hidden rounded-sm text-muted-foreground hover:text-primary sm:inline">Privacy</Link>
+            <a href="/account" target={reviewPage ? "_blank" : undefined} rel={reviewPage ? "noopener noreferrer" : undefined} className="inline-flex min-h-11 items-center gap-1 rounded-sm text-muted-foreground hover:text-primary" title={reviewPage ? "Opens in a new tab to keep your review here" : undefined} aria-label={reviewPage ? "Account (opens in a new tab; keeps your review here)" : "Account"}>Account{reviewPage && <ArrowUpRight aria-hidden="true" className="size-3.5" />}</a>
             {reviewPage ? (
               <span className="rounded-full border bg-muted px-3 py-1.5 text-xs text-muted-foreground">Text confirmation</span>
             ) : (

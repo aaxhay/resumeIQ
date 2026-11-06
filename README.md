@@ -19,11 +19,17 @@ Job-specific mode requires a 50–10,000-character job description. It stays loc
 
 ### Gemini configuration and personal-data gate
 
-Copy `.env.example` to ignored `.env.local` without overwriting an existing configuration. Set server-only `GEMINI_API_KEY` and explicitly selected `GEMINI_MODEL`. Never put credentials in `NEXT_PUBLIC_*`, tracked templates, or chat. Official SDK: `@google/genai@3.0.0`. Missing credentials disable AI rather than produce fake results.
+Copy `.env.example` to ignored `.env.local` without overwriting an existing configuration. Set server-only `GEMINI_API_KEY` and explicitly selected `GEMINI_MODEL`. Never put secret credentials in `NEXT_PUBLIC_*`, tracked templates, or chat. Supabase's explicitly publishable key is public by design and is not a secret/service-role key. Official SDK: `@google/genai@3.0.0`. Missing credentials disable AI rather than produce fake results.
 
 **Default AI use is synthetic-only.** Google unpaid-service terms prohibit personal/confidential inputs. Do not mark a real resume as synthetic even after redaction. `GEMINI_DATA_POLICY=paid-reviewed` is reserved for an operator who has verified paid-service terms/billing, supported regions, adult-use/access restrictions, privacy disclosures, and deployment safeguards. It is not automatic billing verification and has not been enabled here. See [AI integration and data-handling limits](docs/ai-integration.md).
 
-Best-effort contact removal is not anonymity; names, addresses, and identifying context can remain. Provider previews are editable. The application does not persist or log raw resumes, prompts, or AI responses. Google has separate processing/retention terms. Cancellation or timeout does not guarantee avoidance of provider charges.
+Best-effort contact removal is not anonymity; names, addresses, and identifying context can remain. Provider previews are editable. The application does not persist or log raw resumes, prompts, or complete AI responses. Optional account history stores only the separately previewed and consented summary/excerpts described below. Google has separate processing/retention terms. Cancellation or timeout does not guarantee avoidance of provider charges.
+
+### Optional Supabase accounts and summaries
+
+No account is needed for a first review. **Save review summary** offers inline sign-in/signup, an exact preview, and separate storage consent; `/account` provides read-only history and confirmed deletion. Only a minimized summary and limited rewrite excerpts are saved—not files, full resumes, job descriptions, improved drafts, or edit history. The workspace remains memory-only.
+
+Your configured publishable key reached Supabase Auth successfully, but the required tables were absent. History stays **disabled by default**. Apply the reviewed migration and configure/verify retention in the intended project's SQL Editor, then set `SUPABASE_HISTORY_ENABLED=true`; configure Auth callback URLs as documented. No privileged application key is required. See [setup, security, retention, and verification limits](docs/supabase.md). No hosted users, emails, migration, or storage bucket were created during implementation.
 
 ## Commands
 
@@ -62,7 +68,10 @@ src/server/config/           Server-only environment access
 src/lib/resume-export/       Bounded export contracts and line handling
 src/server/documents/        DOCX generation and round-trip verification
 src/server/http/             Shared bounded same-origin JSON reader
-src/server/data/             Reserved optional persistence
+src/features/saved-reviews/  Optional account, consented summary saving, read-only history
+src/lib/saved-reviews/       Strict minimized persistence contracts and projection
+src/server/supabase/         Request-scoped Auth, verified history access, local bounds
+supabase/                   Reviewed migration/RLS and operator retention reference
 scripts/verify-gemini.ts     Explicit synthetic live-provider verification
 ```
 
@@ -71,7 +80,7 @@ The rest of the application uses `ResumeAiProvider`, not Gemini SDK types. Model
 ## Current limits and release blockers
 
 - English-oriented text analysis, not original-layout assessment, fact checking, or exhaustive job coverage.
-- No accounts/saved review history, database, OCR, legacy DOC, billing UI, public deployment, or full generative rewriting. The editing workspace has only a memory-local accepted-edit history.
+- Optional Supabase Auth/saved-summary code is implemented; hosted migration, cleanup scheduling, and live authenticated verification remain operator steps. No persistent resume files, OCR, legacy DOC, billing UI, public deployment, or full generative rewriting. The editing workspace has only memory-local accepted-edit history.
 - AI requests have deadlines, duplicate suppression, local concurrency and request caps. These are **not distributed abuse protection or monetary budgets**; do not expose the endpoint publicly until authenticated/trusted ingress, distributed controls, provider budget limits, and deployment behavior are verified.
 - Local full-project Node execution is supported. Keep worker sources and runtime dependencies; `.next`-only, standalone, Edge, and serverless packaging are not verified. Builds use system fonts without external font fetching.
 - Existing tooling advisories and compatibility exceptions are documented; no forced dependency fixes.
@@ -90,6 +99,7 @@ Earlier validation-recovery quality gate: **482 unit/integration tests**, **68 d
 
 Dashboard milestone quality gate: **460 unit/integration tests**, **66 desktop/mobile browser/API tests**, lint, strict TypeScript, and production build passed. Both modes were tested from real PDF/DOCX upload through dashboard with semantically validated mocked feedback. A live synthetic DOCX → Gemini → job-specific dashboard run also passed; fresh general-mode live attempts returned `INVALID_RESPONSE` and `PROVIDER_ERROR`, with no feedback displayed. Those failed attempts remain recorded as failures. A subsequent recovery fix added missing correction eligibility and safe validation reasons; a fresh real PDF → Gemini → general dashboard run then passed. See [validation-error recovery](docs/ai-integration.md#validation-error-recovery-and-safe-diagnostics). Desktop/mobile screenshots were inspected. The last dependency audit remains zero runtime findings and thirteen documented tooling entries; no dependencies changed. These checks do not establish real-user privacy compliance or hallucination-free analysis.
 
+- [Optional Supabase setup, Auth/RLS, retention, deletion, and verification limits](docs/supabase.md)
 - [DOCX download, content verification, formatting, privacy, and limits](docs/docx-export.md)
 - [Controlled improvement, patch safety, draft lifetime, and limits](docs/resume-improvement.md)
 - [Concise chronological human prompt log](CHAT_LOG.md)

@@ -10,6 +10,7 @@ import { prepareAiText } from "@/lib/ai-review/privacy";
 import type { ReviewMode } from "../review-options";
 import { ResultsDashboard } from "./results/results-dashboard";
 import { ResultsSkeleton } from "./results/results-skeleton";
+import { SaveReviewSummary } from "@/features/saved-reviews/save-review-summary";
 
 type Availability = ReturnType<typeof availabilitySchema.parse>;
 type Response = ReturnType<typeof reviewResponseSchema.parse>;
@@ -170,6 +171,7 @@ export function AiReview({ text, jobDescription, mode, onImprove }: { text: stri
         <div><h3 id="ai-results-title" className="text-lg font-semibold">Gemini review complete</h3><p className="mt-2 text-xs [overflow-wrap:anywhere]">Response model: {result.model}</p></div>
         <Notice>Exact citations are checked against the submitted text, but semantic claims may still be wrong. This is not factual verification, an ATS score, or a hiring guarantee. Verify every suggestion. {result.redacted && "Additional best-effort redaction was applied by the server; some citations may contain redaction placeholders."} Evidence refers to the sent previews, not the original editor.</Notice>
         <ResultsDashboard data={result.data} mode={mode} jobAnalysis={result.jobAnalysis} />
+        <SaveReviewSummary review={result.data} mode={mode} />
         <div className="space-y-3 border-t pt-5"><Button type="button" onClick={() => onImprove(text, result.data, prepareAiText(resumePreview))}>Improve this resume</Button><p className="text-xs leading-6 text-muted-foreground">Open a separate, local draft using these recommendations. Your confirmed original is never overwritten. No additional request is sent to Google. Replacing an existing workspace requires confirmation.</p></div>
       </div>}
     </section>

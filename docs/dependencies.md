@@ -45,9 +45,13 @@ Uploaded-document extraction modules run in a separate Node 24 process, not in b
 
 Installation reported transitive `node-domexception` deprecation and a `protobufjs` postinstall script not approved by npm's script policy. No blanket script approval was granted; build and live generation worked without it. No force audit fixes.
 
-## Deliberately deferred packages
+## Optional Supabase dependencies (installed 2026-11-06)
 
-`@supabase/supabase-js` 2.119.0 (Node >=22) was checked earlier but remains uninstalled; persistence is unneeded. Recheck metadata before any future adoption. Parser bundling/resource behavior and AI controls still require actual deployment verification.
+- Runtime `@supabase/supabase-js` **2.119.0**, Node >=22; compatible with Node 24.
+- Runtime `@supabase/ssr` **0.12.7**, peer supabase-js ^2.114.0, request-scoped server cookie clients.
+- Development-only `@electric-sql/pglite` **0.5.15**, embedded real PostgreSQL/WASM for migration and RLS tests. Test Auth helpers are stand-ins, not hosted Auth verification.
+
+These packages do not become dependencies of anonymous extraction, local analysis, editing, or DOCX generation. No database or Storage bucket is automatically provisioned. See [optional Supabase](supabase.md). Parser packaging, auth deployment, and distributed controls remain release requirements.
 
 ## Tooling compatibility exception
 
@@ -57,7 +61,7 @@ The checked latest ESLint was 10.14.0. Next's dependency `eslint-plugin-react` 7
 
 ## Security audit snapshot
 
-Audit rerun after promoting `docx@9.15.2` to runtime on 2026-11-06 (unchanged findings from the Gemini milestone):
+Audit rerun after installing Supabase runtime packages and development-only PGlite on 2026-11-06 (unchanged findings from the DOCX/Gemini milestones):
 
 - `npm audit --omit=dev`: **0 reported vulnerabilities**.
 - Full `npm audit`: **13 affected dependency entries — 2 low, 11 moderate; no high or critical**. These are development/build tooling dependencies, not 13 independent root vulnerabilities.
@@ -80,4 +84,4 @@ This is **not a clean full audit** and not a security certification. Keep untrus
 - [Vitest getting started](https://vitest.dev/guide/) — installation and Node/Vite requirements.
 - [Playwright introduction](https://playwright.dev/docs/intro) and [web server configuration](https://playwright.dev/docs/test-webserver) — browser setup and managed server lifecycle.
 
-Supabase documentation was not needed for installation because no Supabase package or infrastructure was added. Consult its current SSR/Auth/RLS documentation if persistence is approved later.
+Supabase adoption used current [Next.js SSR/Auth guidance](https://supabase.com/docs/guides/auth/server-side/nextjs), [RLS guidance](https://supabase.com/docs/guides/database/postgres/row-level-security), and [PGlite documentation](https://pglite.dev/docs/), plus npm engines/peers. Hosted provisioning was not performed.
