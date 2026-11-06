@@ -37,6 +37,8 @@ No AI feedback is shown. Check the previews, then use Retry Gemini review to mak
 
 23. **Notice cleanup, download scrolling, independent review and debugging (summary; requested 2026-11-07).** Remove the long “Text extraction is ready” announcement and database-setup information box. After DOCX download, move to the top of the review page without requiring manual scrolling. Inspect before modifying code; independently review architecture, business logic, TypeScript, security, performance, error handling, duplication, abstractions, tests, and `CLAUDE.md` compliance, especially privacy, AI evidence, extraction, API security, and user isolation. Report prioritized findings with locations, impact, and fixes; repair critical/high issues first. Reproduce failures, establish actual root causes, make minimal safe corrections, add regressions, run relevant tests, and report exactly what changed and remains. Do not rewrite unrelated modules, weaken checks, suppress errors without justification, remove tests, substitute mocks for real functionality, or claim unreproduced issues are fixed.
 
+24. **Evaluator TypeScript error report (summary; 2026-11-07).** Reported TS2307 for the old `../src/server/ai/grounding.ts` import in `scripts/ai-evaluation.ts`, followed by TS7006 implicit-parameter-type errors for `field`, `reason`, and `technology`.
+
 ## Standing implementation requirements
 
 - Strict TypeScript; no `any`; validate external inputs and use typed contracts.
