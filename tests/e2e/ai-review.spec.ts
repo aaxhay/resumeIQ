@@ -244,6 +244,42 @@ test("validation failure explains its safe reason and preserves previews for an 
   expect(requests).toHaveLength(1);
 });
 
+for (const [issue, explanation] of [
+  ["job_claim", "not proof that you lack a skill"],
+  ["unverified_number", "do not add invented numbers to make the review pass"],
+] as const) {
+  test(`job-specific ${issue} preserves both previews and requires an explicit retry`, async ({ page }) => {
+    let attempt = 0;
+    const requests = await mockReviews(page, { post: async (route, body) => {
+      attempt++;
+      if (attempt === 1) await route.fulfill({ status: 502, json: { ok: false, error: { code: "INVALID_RESPONSE", message: "PRIVATE_PROVIDER_DETAIL", retryable: true, validationIssue: issue } } });
+      else await route.fulfill({ json: success(body) });
+    } });
+    await prepare(page, "job-specific");
+    await resumeInput(page).fill(preview);
+    const jobInput = page.getByRole("textbox", { name: "Job description preview to send", exact: true });
+    await jobInput.fill(jobPreview);
+    await authorize(page);
+    await send(page).click();
+    const alert = page.getByRole("region", { name: "Gemini AI review", exact: true }).getByRole("alert");
+    await expect(alert).toBeFocused();
+    await expect(alert).toContainText(explanation);
+    await expect(alert).toContainText(`Reason: ${issue}`);
+    await expect(page.getByText("PRIVATE_PROVIDER_DETAIL")).toHaveCount(0);
+    await expect(results(page)).toHaveCount(0);
+    await expect(resumeInput(page)).toHaveValue(preview);
+    await expect(jobInput).toHaveValue(jobPreview);
+    const retry = page.getByRole("button", { name: "Retry Gemini review", exact: true });
+    await expect(retry).toBeEnabled();
+    expect(requests).toHaveLength(1);
+    await retry.click();
+    await expect(results(page)).toBeFocused();
+    expect(requests).toHaveLength(2);
+    expect(requests[1]).toMatchObject({ mode: "job-specific", resumeText: preview, jobDescription: jobPreview });
+    expect(requests[1]?.requestId).not.toBe(requests[0]?.requestId);
+  });
+}
+
 test("validation sends nothing, malformed response is rejected, and explicit retries use new IDs", async ({ page }) => {
   let attempt = 0;
   const requests = await mockReviews(page, { post: async (route, body) => {

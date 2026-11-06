@@ -1,6 +1,6 @@
 # Implementation checklist
 
-The 1–2 day target prioritizes one trustworthy complete workflow over account/history features. Only check items after implementation and verification. The current authorization boundary includes **server extraction, confirmed previews, Gemini review, job-description analysis, and the results dashboard**. Export remains future work.
+The 1–2 day target prioritizes one trustworthy complete workflow over account/history features. Only check items after implementation and verification. The current authorization boundary includes **server extraction, confirmed previews, Gemini review, job-description analysis, the results dashboard, and controlled resume improvement**. Export remains future work.
 
 ## Phase 0 — Foundation (completed)
 
@@ -96,12 +96,22 @@ See [results-dashboard.md](results-dashboard.md) for contracts, conservative mat
 - [x] Inspect desktop synthetic dashboard and mobile live job-specific dashboard screenshots; verify live DOCX → Gemini → job results. General live attempts in this milestone returned safe validation/provider errors; do not count them as successful live general verification.
 - [x] Pass final `npm run check`: lint, strict types, 460 unit/integration tests, production build, and 66 desktop/mobile browser/API tests.
 
-## Phase 3 — Improvements and export (day 2, first)
+## Current — Controlled resume improvement
 
-Dependencies: valid analysis and user-approved content model.
+Dependencies: validated evidence-backed review. See [resume-improvement.md](resume-improvement.md).
 
-- [ ] Implement user edits and clear accept/reject controls; retain original facts.
-- [ ] Invalidate stale results when source text/mode/job description changes.
+- [x] Verify immutable confirmed original, separate improved preview, suggestion IDs/reasons/evidence/statuses, and exact original-coordinate patches.
+- [x] Verify comparison, accept/reject/manual save, undo latest acceptance, and confirmed restore.
+- [x] Verify duplicate-location selection, missing/redacted targets, target caps, stale revisions, overlap conflicts, and multiple same-section edits.
+- [x] Verify conservative AI wording safety, explicit user-authored manual drafts, and no added provider calls.
+- [x] Verify retained drafts across analysis invalidation, confirmed workspace replacement, and confirmed Start over.
+- [x] Verify both modes from real upload through editing with mocked validated feedback, keyboard focus, desktop/mobile screenshots, and narrow layouts.
+- [x] Pass `npm run check`: 526 unit/integration tests, 80 desktop/mobile browser/API tests, lint, strict types, and production build. Maintain root `CHAT_LOG.md`.
+- [x] Record live-provider limitation honestly: fresh synthetic PDF review returned `PROVIDER_ERROR` before improvement; no retry or live-success claim.
+
+## Future — DOCX export
+
+Dependencies: user-approved improved content. Export remains unimplemented.
 - [ ] Move `docx` from fixture-only dev dependency to runtime when export is authorized; generate simple ATS-friendly DOCX from approved content only.
 - [ ] Handle download failures and invalid/empty export data.
 - [ ] Test DOCX structure and round-trip text; no formatting-preservation claim.

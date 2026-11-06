@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { Textarea } from "@/components/ui/textarea";
-import { availabilitySchema, MAX_AI_TEXT, reviewRequestSchema, reviewResponseSchema, type ValidationIssue } from "@/lib/ai-review/contracts";
+import { availabilitySchema, MAX_AI_TEXT, reviewRequestSchema, reviewResponseSchema, type AiReview as AiReviewData, type ValidationIssue } from "@/lib/ai-review/contracts";
 import { prepareAiText } from "@/lib/ai-review/privacy";
 import type { ReviewMode } from "../review-options";
 import { ResultsDashboard } from "./results/results-dashboard";
@@ -31,13 +31,15 @@ const VALIDATION_MESSAGES: Record<ValidationIssue, string> = {
   coverage: "Gemini omitted or repeated required review sections. This is a response-generation error, not a problem with your resume.",
   evidence: "Gemini returned missing, inconsistent, or non-matching evidence citations. The response was rejected to avoid showing unsupported advice.",
   rewrite: "Gemini returned a rewrite that failed the source-evidence checks. Nothing has been applied to your resume.",
-  unsupported_claim: "Gemini introduced an unverified number or an unsupported job-match claim. The response was rejected rather than displaying that claim.",
+  unsupported_claim: "Gemini returned unverified numeric or job-match claims. The response was rejected rather than displaying those claims.",
+  unverified_number: "Gemini used a number that could not be verified in the supplied previews, such as a calculated duration or an example metric. No feedback was accepted. This does not mean your resume is incorrect; do not add invented numbers to make the review pass.",
+  job_claim: "Gemini marked a job requirement as supported, but its resume citations did not explicitly cover the complete requirement. Related experience may still be relevant; the comparison needs a more cautious assessment. This is an AI-response error, not proof that you lack a skill. No feedback was accepted.",
   output_limit: "Gemini reached a response-size limit. No partial analysis is shown. A shorter preview may help, but do not remove relevant facts just to obtain a result.",
   blocked: "Gemini did not return a usable response because of a provider content restriction. Repeated retries may not help; local text checks remain available.",
   incomplete: "Gemini returned an empty or incomplete response. No partial analysis is shown.",
 };
 /** Mount only while upstream text and review preferences are confirmed. */
-export function AiReview({ text, jobDescription, mode }: { text: string; jobDescription: string; mode: ReviewMode }) {
+export function AiReview({ text, jobDescription, mode, onImprove }: { text: string; jobDescription: string; mode: ReviewMode; onImprove: (original: string, review: AiReviewData, sentPreview: string) => void }) {
   const [resumePreview, setResumePreview] = useState(() => prepareAiText(text));
   const [jobPreview, setJobPreview] = useState(() => prepareAiText(jobDescription));
   const [consent, setConsent] = useState(false);
@@ -168,6 +170,7 @@ export function AiReview({ text, jobDescription, mode }: { text: string; jobDesc
         <div><h3 id="ai-results-title" className="text-lg font-semibold">Gemini review complete</h3><p className="mt-2 text-xs [overflow-wrap:anywhere]">Response model: {result.model}</p></div>
         <Notice>Exact citations are checked against the submitted text, but semantic claims may still be wrong. This is not factual verification, an ATS score, or a hiring guarantee. Verify every suggestion. {result.redacted && "Additional best-effort redaction was applied by the server; some citations may contain redaction placeholders."} Evidence refers to the sent previews, not the original editor.</Notice>
         <ResultsDashboard data={result.data} mode={mode} jobAnalysis={result.jobAnalysis} />
+        <div className="space-y-3 border-t pt-5"><Button type="button" onClick={() => onImprove(text, result.data, prepareAiText(resumePreview))}>Improve this resume</Button><p className="text-xs leading-6 text-muted-foreground">Open a separate, local draft using these recommendations. Your confirmed original is never overwritten. No additional request is sent to Google. Replacing an existing workspace requires confirmation.</p></div>
       </div>}
     </section>
   </Card>;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,9 +13,30 @@ import { ReviewModeSelect } from "./review-mode-select";
 import { SetupConfirmation } from "./setup-confirmation";
 import { DeterministicReview } from "./deterministic-review";
 import { AiReview } from "./ai-review";
+import { ResumeImprovement } from "./resume-improvement";
+import { createImprovementSession } from "@/lib/resume-improvement/editor";
+import type { ImprovementSession } from "@/lib/resume-improvement/contracts";
+import type { AiReview as AiReviewData } from "@/lib/ai-review/contracts";
 
 export function ReviewSetupForm() {
   const setup = useReviewSetup();
+  const [workspace, setWorkspace] = useState<{ initial: ImprovementSession; key: number }>();
+  const [replacement, setReplacement] = useState<ImprovementSession>();
+  const [improvementError, setImprovementError] = useState("");
+  const [confirmReset, setConfirmReset] = useState(false);
+  const replacementPanel = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (replacement) replacementPanel.current?.focus(); }, [replacement]);
+
+  function improve(original: string, review: AiReviewData, sentPreview: string) {
+    try {
+      const initial = createImprovementSession(original, review, sentPreview);
+      setImprovementError("");
+      if (workspace) setReplacement(initial);
+      else setWorkspace({ initial, key: 0 });
+    } catch {
+      setImprovementError("The recommendation evidence could not be mapped safely. No draft was created or replaced; your original is unchanged.");
+    }
+  }
   const fileInput = useRef<HTMLInputElement>(null);
   const pasteInput = useRef<HTMLTextAreaElement>(null);
   const jobInput = useRef<HTMLTextAreaElement>(null);
@@ -44,6 +65,11 @@ export function ReviewSetupForm() {
     if (result === "paste") pasteInput.current?.focus();
     if (result === "job-description") jobInput.current?.focus();
     if (result === "error") errorPanel.current?.focus();
+  }
+  function startOver() {
+    focusAfterReset.current = true;
+    setWorkspace(undefined); setReplacement(undefined); setImprovementError(""); setConfirmReset(false);
+    setup.reset();
   }
   function confirm() {
     const result = setup.confirmText();
@@ -77,8 +103,9 @@ export function ReviewSetupForm() {
                 {setup.processing ? <><LoaderCircle aria-hidden="true" className="animate-spin motion-reduce:animate-none" /> Processing resume…</> : <>{setup.source === "file" ? "Extract resume text" : "Prepare pasted text"}<ArrowRight aria-hidden="true" /></>}
               </Button>
               {setup.processing && <Button type="button" variant="outline" onClick={setup.cancel}>Cancel processing</Button>}
-              <Button type="button" variant="ghost" onClick={() => { focusAfterReset.current = true; setup.reset(); }}>Start over</Button>
+              <Button type="button" variant="ghost" onClick={() => { if (workspace) setConfirmReset(true); else startOver(); }}>Start over</Button>
             </div>
+            {confirmReset && <div role="group" aria-label="Confirm start over" className="mt-4 space-y-3 rounded-lg border p-4"><p className="text-sm leading-6">Clear the setup, original snapshot, improved draft, and all local decisions? Copy any text you want to keep first. This cannot undo a provider transfer.</p><div className="flex flex-wrap gap-2"><Button type="button" onClick={startOver}>Clear everything and start over</Button><Button type="button" variant="outline" onClick={() => setConfirmReset(false)}>Keep my work</Button></div></div>}
             <p role="status" className="mt-3 text-sm text-muted-foreground">{setup.processing ? "Reading your resume. You can cancel at any time." : setup.extraction ? "Text is ready below. Edit it directly, or replace your input to extract again." : ""}</p>
           </div>
           {setup.error && <Notice ref={errorPanel} tabIndex={-1} tone="error" role="alert" className="mt-4">
@@ -103,7 +130,13 @@ export function ReviewSetupForm() {
         editor.current?.setSelectionRange(start, end);
         editor.current?.scrollIntoView({ block: "center" });
       }} />}
-      {setup.confirmed && <AiReview text={setup.editedText} jobDescription={setup.jobDescription} mode={setup.mode} />}
+      {setup.confirmed && <AiReview text={setup.editedText} jobDescription={setup.jobDescription} mode={setup.mode} onImprove={improve} />}
+      {improvementError && <Notice role="alert" tone="error">{improvementError}</Notice>}
+      {replacement && <Notice ref={replacementPanel} tabIndex={-1}>
+        <p className="font-semibold">Replace the current improvement workspace?</p><p className="mt-2">This discards its local edits, rejected suggestions, and undo history. Copy anything you want to keep first. The existing draft remains untouched until you confirm.</p>
+        <div className="mt-3 flex flex-wrap gap-3"><Button type="button" onClick={() => { setWorkspace(current => ({ initial: replacement, key: (current?.key ?? 0) + 1 })); setReplacement(undefined); }}>Replace improvement workspace</Button><Button type="button" variant="outline" onClick={() => setReplacement(undefined)}>Keep current workspace</Button></div>
+      </Notice>}
+      {workspace && <ResumeImprovement key={workspace.key} initialSession={workspace.initial} />}
     </div>
   );
 }

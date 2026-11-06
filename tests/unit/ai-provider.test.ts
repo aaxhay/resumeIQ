@@ -35,6 +35,32 @@ const correctionCases: { name: string; reason: string; job?: boolean; mutate: (d
 ];
 
 describe("provider boundary", () => {
+  it("corrects simultaneous job-match and numeric failures with bounded field-specific diagnostics", async () => {
+    const valid = validAiReview(true);
+    const invalid = structuredClone(valid);
+    invalid.jobMatches[1]!.status = "supported";
+    invalid.jobMatches[1]!.resumeEvidence = [aiQuote];
+    invalid.assessment = "PRIVATE_REJECTED_PROSE with invented 77 years of experience.";
+    mocks.generate.mockResolvedValueOnce({ text: JSON.stringify(invalid), candidates: [{ finishReason: "STOP" }] });
+    mocks.generate.mockResolvedValueOnce({ text: JSON.stringify(valid), candidates: [{ finishReason: "STOP" }] });
+    expect(await createGeminiProvider().analyzeJobMatch(aiResume, aiJob)).toEqual(valid);
+    expect(mocks.generate).toHaveBeenCalledTimes(2);
+    const correction = mocks.generate.mock.calls[1]?.[0];
+    expect(correction.config.systemInstruction).toContain("unsupported-requirement-claim@jobMatches.1.status");
+    expect(correction.config.systemInstruction).toContain("introduced-number@assessment");
+    expect(correction.config.systemInstruction).not.toContain("PRIVATE_REJECTED_PROSE");
+    expect(correction.contents).toEqual(mocks.generate.mock.calls[0]?.[0].contents);
+    expect(correction.config.abortSignal).toBeDefined();
+  });
+  it("still rejects repeated unsupported job claims after exactly one correction", async () => {
+    const invalid = validAiReview(true);
+    invalid.jobMatches[1]!.status = "supported";
+    invalid.jobMatches[1]!.resumeEvidence = [aiQuote];
+    mocks.generate.mockResolvedValue({ text: JSON.stringify(invalid), candidates: [{ finishReason: "STOP" }] });
+    const error = await createGeminiProvider().analyzeJobMatch(aiResume, aiJob).catch((error: unknown) => error);
+    expect(safeAiFailure(error).body.error).toMatchObject({ code: "INVALID_RESPONSE", validationIssue: "job_claim" });
+    expect(mocks.generate).toHaveBeenCalledTimes(2);
+  });
   it.each(correctionCases)("corrects $name once instead of failing without recovery", async ({ mutate, job, reason }) => {
     const valid = validAiReview(job); const invalid = structuredClone(valid); mutate(invalid);
     expect(() => validateReview(invalid, aiResume, job ? aiJob : undefined)).toThrow(expect.objectContaining({ cause: reason }));
@@ -140,7 +166,7 @@ describe("safe validation diagnostics", () => {
   it.each([
     ["schema-shape-or-bounds:priorities.0.resumeEvidence:too_small", "format"],
     ["incomplete-area-coverage", "coverage"], ["non-exact-evidence", "evidence"],
-    ["non-extractive-rewrite", "rewrite"], ["introduced-number", "unsupported_claim"],
+    ["non-extractive-rewrite", "rewrite"], ["introduced-number", "unverified_number"], ["unsupported-requirement-claim", "job_claim"],
     ["output-token-limit", "output_limit"], ["blocked-output", "blocked"], ["empty-output", "incomplete"],
   ])("maps %s to an allowlisted public reason", (cause, issue) => {
     const response = safeAiFailure(invalidResponse(cause)).body;

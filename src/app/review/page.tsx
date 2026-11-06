@@ -24,7 +24,7 @@ export default function ReviewPage() {
         </div>
         <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div className="min-w-0">
-            <Notice className="mb-5"><strong className="text-foreground">Text extraction is ready.</strong> Upload or paste, confirm your edits, then run explainable text checks. Optional Gemini review requires configuration, preview review, and explicit consent. Synthetic-only by default; export is not available yet.</Notice>
+            <Notice className="mb-5"><strong className="text-foreground">Text extraction is ready.</strong> Upload or paste, confirm your edits, then run explainable text checks. Optional Gemini review requires configuration, preview review, and explicit consent. Synthetic-only by default. After review, improve a separate draft with accept, reject, edit, and undo controls; export is not available yet.</Notice>
             <noscript><Notice tone="error" className="mb-5">Enable JavaScript to upload a file or paste text. Nothing has been uploaded.</Notice></noscript>
             <ReviewSetupForm />
           </div>

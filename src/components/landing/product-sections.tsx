@@ -36,7 +36,7 @@ export function HowItWorks() {
           {[
             { title: "Add your resume", description: "Upload a PDF or DOCX, or paste your text. Choose a review mode, then inspect, edit, and confirm the extracted text.", stage: "Available now", Icon: FileCheck2 },
             { title: "Find your opportunities", description: "Run local text checks, or review minimized previews and explicitly consent to Gemini feedback. Synthetic-only by default.", stage: "Gemini when configured", Icon: ScanText },
-            { title: "Make it your own", description: "Review suggestions, refine your wording, and export your approved resume as DOCX.", stage: "Planned", Icon: PencilLine },
+            { title: "Make it your own", description: "Accept, reject, or edit recommendations in a separate draft. Undo edits or restore the original. DOCX export is still planned.", stage: "Controlled editing available", Icon: PencilLine },
           ].map(({ title, description, stage, Icon }, index) => (
             <li key={title} className="border-t pt-5">
               <div className="mb-5 flex items-center justify-between text-primary"><Icon aria-hidden="true" className="size-5" /><span className="text-xs font-medium">0{index + 1} / {stage}</span></div>
