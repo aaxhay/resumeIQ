@@ -1,6 +1,7 @@
 import { parseGeminiEnvironment } from "@/lib/config/env";
 import { prepareAiText } from "@/lib/ai-review/privacy";
-import { reviewRequestSchema } from "@/lib/ai-review/contracts";
+import { reviewRequestSchema, reviewResponseSchema } from "@/lib/ai-review/contracts";
+import { analyzeJobDescription } from "@/server/ai/job-analysis";
 import { createGeminiProvider } from "@/server/ai/gemini";
 import { readReviewRequest } from "@/server/ai/request";
 import { acquireReview } from "@/server/ai/guard";
@@ -29,7 +30,9 @@ export async function POST(request: Request): Promise<Response> {
     const output = jobDescription === undefined ? await provider.analyzeResume(resumeText, request.signal) : await provider.analyzeJobMatch(resumeText, jobDescription, request.signal);
     // Validate at the application boundary as well: alternative providers must obey the same contract.
     const data = validateReview(output, resumeText, jobDescription);
-    return Response.json({ ok: true, data, model: provider.model, redacted: resumeText !== input.resumeText || (input.mode === "job-specific" && jobDescription !== input.jobDescription) }, { headers });
+    const jobAnalysis = jobDescription === undefined ? null : analyzeJobDescription(data, resumeText, jobDescription);
+    const response = reviewResponseSchema.parse({ ok: true, data, jobAnalysis, model: provider.model, redacted: resumeText !== input.resumeText || (input.mode === "job-specific" && jobDescription !== input.jobDescription) });
+    return Response.json(response, { headers });
   } catch (error) {
     const failure = safeAiFailure(error);
     return Response.json(failure.body, { status: failure.status, headers: { ...headers, ...(failure.status === 429 || failure.status === 409 ? { "Retry-After": "60" } : {}) } });

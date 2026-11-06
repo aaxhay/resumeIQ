@@ -1,6 +1,6 @@
 # Implementation checklist
 
-The 1–2 day target prioritizes one trustworthy complete workflow over account/history features. Only check items after implementation and verification. The current authorization boundary is **server upload, extraction, and editable text confirmation**. AI analysis and export remain future work.
+The 1–2 day target prioritizes one trustworthy complete workflow over account/history features. Only check items after implementation and verification. The current authorization boundary includes **server extraction, confirmed previews, Gemini review, job-description analysis, and the results dashboard**. Export remains future work.
 
 ## Phase 0 — Foundation (completed)
 
@@ -40,7 +40,7 @@ Dependencies: foundation. Local full-project Node 24 execution; public deploymen
 - [x] Implement killable parser processes, ZIP expansion limits, and resource cleanup (OS/container isolation remains deployment work).
 - [x] Extract plain text; handle corrupt, protected, empty, and low-text/scanned documents as processing errors, with pasted-text fallback.
 - [x] Implement local mode selection; require job description only for job-specific mode (Phase 1 UI).
-- [ ] Enforce mode/job-description validation in the future analysis endpoint (not part of extraction; job descriptions are never sent to the extraction endpoint).
+- [x] Enforce mode/job-description validation in the analysis endpoint (completed in the later Gemini milestone; job descriptions are never sent to the extraction endpoint).
 - [x] Show editable extracted/pasted text and validate confirmation; analysis was not part of this extraction milestone.
 - [x] Add loading/error/empty/success states, keyboard/focus behavior, cancellation, and file replacement/reset.
 - [x] Test synthetic PDF/DOCX fixtures and rejection cases; E2E upload → mode → inspect → edit → confirm.
@@ -81,6 +81,20 @@ Dependencies: confirmed text, configured key/model, explicit minimized-preview c
 - [x] Run actual Gemini general/job/injection checks using only synthetic fixtures.
 - [x] Drive actual desktop general and mobile job-specific browser flows through Gemini with no API mocking; inspect screenshots and verify stale results clear.
 - [ ] Verify real-user paid-service/privacy and public deployment configuration separately; not enabled by this milestone.
+
+## Current — Job-description analysis and results dashboard
+
+See [results-dashboard.md](results-dashboard.md) for contracts, conservative matching, and verification limits.
+
+- [x] Extract explicit title/company, required/preferred skills, responsibilities, experience, and education/certification requirements with exact evidence; missing fields stay unknown.
+- [x] Validate source slices/locations and bounded requirement inventory; disclose English/heading coverage and truncation limits.
+- [x] Reuse validated AI matches without a second model call; leave unmatched extracted requirements Not assessed and allow sparse descriptions with no assessable requirements.
+- [x] Render overview, three priorities, strengths/opportunities, requested finding groups, and reusable collapsible evidence/action/rewrite cards.
+- [x] Add job metadata, required/preferred coverage lists, all four status filters, methodology, and limitations without invented scores or statistics.
+- [x] Preserve consent, safe retry/cancel, stale-result invalidation, and add an honest loading skeleton.
+- [x] Test real PDF/general and DOCX/job upload-through-dashboard journeys with validated mocked feedback and exact displayed evidence; check keyboard and narrow layouts.
+- [x] Inspect desktop synthetic dashboard and mobile live job-specific dashboard screenshots; verify live DOCX → Gemini → job results. General live attempts in this milestone returned safe validation/provider errors; do not count them as successful live general verification.
+- [x] Pass final `npm run check`: lint, strict types, 460 unit/integration tests, production build, and 66 desktop/mobile browser/API tests.
 
 ## Phase 3 — Improvements and export (day 2, first)
 

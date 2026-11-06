@@ -12,7 +12,9 @@ import { ApiError } from "@google/genai";
 import { createGeminiProvider } from "@/server/ai/gemini";
 import { validateReview, validateRewrite } from "@/server/ai/validate";
 import { prepareAiText } from "@/lib/ai-review/privacy";
-import { reviewRequestSchema } from "@/lib/ai-review/contracts";
+import { reviewRequestSchema, reviewResponseSchema, type AiReview } from "@/lib/ai-review/contracts";
+import { invalidResponse, safeAiFailure } from "@/server/ai/errors";
+import { validationFailure } from "@/server/ai/validation-failures";
 import { aiResume, aiJob, aiQuote, validAiReview } from "../fixtures/ai-review";
 
 beforeEach(() => {
@@ -22,7 +24,34 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 
+const correctionCases: { name: string; reason: string; job?: boolean; mutate: (data: AiReview) => void }[] = [
+  { name: "duplicate areas", reason: "incomplete-area-coverage", mutate: data => { data.areas[0] = data.areas[1]!; } },
+  { name: "duplicate finding IDs", reason: "duplicate-finding-id", mutate: data => { data.findings.push(data.findings[0]!); } },
+  { name: "missing high-impact evidence", reason: "missing-high-impact-evidence", mutate: data => { data.findings[0]!.impact = "high"; data.findings[0]!.resumeEvidence = []; } },
+  { name: "uncited rewrite original", reason: "uncited-rewrite", mutate: data => { const original = "Created a guide that enabled independent onboarding."; data.findings[0]!.suggestedRewrite = { original, revised: original }; } },
+  { name: "job matches in general review", reason: "unexpected-job-matches", mutate: data => { data.jobMatches = validAiReview(true).jobMatches; } },
+  { name: "missing partial evidence", reason: "missing-partial-evidence", job: true, mutate: data => { data.jobMatches[0]!.status = "partially_supported"; data.jobMatches[0]!.resumeEvidence = []; } },
+  { name: "conflicting absent evidence", reason: "conflicting-match-evidence", job: true, mutate: data => { data.jobMatches[1]!.resumeEvidence = [aiQuote]; } },
+];
+
 describe("provider boundary", () => {
+  it.each(correctionCases)("corrects $name once instead of failing without recovery", async ({ mutate, job, reason }) => {
+    const valid = validAiReview(job); const invalid = structuredClone(valid); mutate(invalid);
+    expect(() => validateReview(invalid, aiResume, job ? aiJob : undefined)).toThrow(expect.objectContaining({ cause: reason }));
+    mocks.generate.mockResolvedValueOnce({ text: JSON.stringify(invalid), candidates: [{ finishReason: "STOP" }] });
+    mocks.generate.mockResolvedValue({ text: JSON.stringify(valid), candidates: [{ finishReason: "STOP" }] });
+    const provider = createGeminiProvider();
+    expect(await (job ? provider.analyzeJobMatch(aiResume, aiJob) : provider.analyzeResume(aiResume))).toEqual(valid);
+    expect(mocks.generate).toHaveBeenCalledTimes(2);
+    expect(mocks.generate.mock.calls[1]?.[0].config.systemInstruction).toContain(reason);
+    expect(mocks.generate.mock.calls[1]?.[0].contents).toEqual(mocks.generate.mock.calls[0]?.[0].contents);
+  });
+  it("still rejects repeated structural failures after the single correction", async () => {
+    const invalid = validAiReview(); invalid.areas[0] = invalid.areas[1]!;
+    mocks.generate.mockResolvedValue({ text: JSON.stringify(invalid), candidates: [{ finishReason: "STOP" }] });
+    await expect(createGeminiProvider().analyzeResume(aiResume)).rejects.toMatchObject({ code: "INVALID_RESPONSE", cause: "incomplete-area-coverage" });
+    expect(mocks.generate).toHaveBeenCalledTimes(2);
+  });
   it("accepts valid structured output and disables SDK automatic retries", async () => {
     expect(await createGeminiProvider().analyzeResume(aiResume)).toEqual(validAiReview());
     expect(mocks.constructor.mock.calls[0]?.[0]).toMatchObject({ httpOptions: { timeout: 60_000, retryOptions: { attempts: 1 } } });
@@ -47,6 +76,20 @@ describe("provider boundary", () => {
   it.each(["MAX_TOKENS", "SAFETY", "RECITATION"])("rejects incomplete/blocked response %s", async finishReason => {
     mocks.generate.mockResolvedValue({ text: JSON.stringify(validAiReview()), candidates: [{ finishReason }] });
     await expect(createGeminiProvider().analyzeResume(aiResume)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
+  it.each([
+    ["MAX_TOKENS", "output_limit"], ["SAFETY", "blocked"], ["RECITATION", "blocked"], [undefined, "incomplete"],
+  ] as const)("reports safe reason for finish %s without a hidden retry", async (finishReason, validationIssue) => {
+    mocks.generate.mockResolvedValue({ text: JSON.stringify(validAiReview()), candidates: [{ finishReason }] });
+    const error = await createGeminiProvider().analyzeResume(aiResume).catch((error: unknown) => error);
+    expect(safeAiFailure(error).body.error).toMatchObject({ code: "INVALID_RESPONSE", validationIssue });
+    expect(mocks.generate).toHaveBeenCalledTimes(1);
+  });
+  it("reports prompt blocking even without a response candidate", async () => {
+    mocks.generate.mockResolvedValue({ promptFeedback: { blockReason: "SAFETY" } });
+    const error = await createGeminiProvider().analyzeResume(aiResume).catch((error: unknown) => error);
+    expect(safeAiFailure(error).body.error).toMatchObject({ validationIssue: "blocked" });
+    expect(mocks.generate).toHaveBeenCalledTimes(1);
   });
   it("rejects oversized model output", async () => {
     mocks.generate.mockResolvedValue({ text: " ".repeat(100_001), candidates: [{ finishReason: "STOP" }] });
@@ -93,6 +136,29 @@ describe("provider boundary", () => {
   });
 });
 
+describe("safe validation diagnostics", () => {
+  it.each([
+    ["schema-shape-or-bounds:priorities.0.resumeEvidence:too_small", "format"],
+    ["incomplete-area-coverage", "coverage"], ["non-exact-evidence", "evidence"],
+    ["non-extractive-rewrite", "rewrite"], ["introduced-number", "unsupported_claim"],
+    ["output-token-limit", "output_limit"], ["blocked-output", "blocked"], ["empty-output", "incomplete"],
+  ])("maps %s to an allowlisted public reason", (cause, issue) => {
+    const response = safeAiFailure(invalidResponse(cause)).body;
+    expect(response.error.validationIssue).toBe(issue);
+    expect(reviewResponseSchema.safeParse(response).success).toBe(true);
+    expect(JSON.stringify(response)).not.toContain(cause);
+  });
+  it("never returns raw diagnostics, documents or provider error text", () => {
+    const privateText = "PRIVATE_RESUME_AND_PROVIDER_PAYLOAD";
+    expect(validationFailure(privateText)).toBeUndefined();
+    expect(validationFailure("constructor")).toBeUndefined();
+    expect(validationFailure("non-exact-evidence:" + privateText)).toBeUndefined();
+    const response = safeAiFailure(invalidResponse(privateText)).body;
+    expect(response.error).not.toHaveProperty("validationIssue");
+    expect(JSON.stringify(response)).not.toContain(privateText);
+  });
+});
+
 describe("evidence and factual guardrails", () => {
   it("rejects fabricated or missing exact evidence", () => {
     for (const evidence of [[], ["Led a Kubernetes migration."]]) {
@@ -133,9 +199,9 @@ describe("evidence and factual guardrails", () => {
   it("rejects invalid enums, overlong strings and too many priorities", () => {
     for (const changes of [{ assessment: "a".repeat(1201) }, { priorities: [] }, { jobMatches: [{ status: "perfect" }] }]) expect(() => validateReview({ ...validAiReview(), ...changes }, aiResume)).toThrow();
   });
-  it("requires job evidence and matching mode completeness", () => {
+  it("requires job evidence in job mode but permits no assessable requirements", () => {
     expect(() => validateReview(validAiReview(true), aiResume)).toThrow();
-    expect(() => validateReview(validAiReview(), aiResume, aiJob)).toThrow();
+    expect(validateReview(validAiReview(), aiResume, aiJob).jobMatches).toEqual([]);
     const data = validAiReview(true); data.jobMatches[0]!.jobEvidence = "Invented requirement";
     expect(() => validateReview(data, aiResume, aiJob)).toThrow();
   });

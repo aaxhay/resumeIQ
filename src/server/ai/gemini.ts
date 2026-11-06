@@ -7,6 +7,7 @@ import { parseGeminiEnvironment } from "../../lib/config/env.ts";
 import { AiError, invalidResponse } from "./errors.ts";
 import { SYSTEM_INSTRUCTION, documentPrompt } from "./prompts.ts";
 import { validateReview, validateRewrite } from "./validate.ts";
+import { validationFailure } from "./validation-failures.ts";
 import type { ResumeAiProvider } from "./provider.ts";
 
 export const PROVIDER_TIMEOUT_MS = 60_000;
@@ -21,12 +22,17 @@ export function createGeminiProvider(): ResumeAiProvider {
     try {
       combined.throwIfAborted();
       const response = await ai.models.generateContent({ model, contents: [{ role: "user", parts: [{ text: prompt }] }], config: {
-        systemInstruction: SYSTEM_INSTRUCTION + (validationFeedback ? `\nVALIDATOR CORRECTION: A previous attempt was rejected (${validationFeedback}). Generate a fresh complete response. Each priority and strength MUST cite one to three exact resume substrings; if a missing section has no quote, prioritize an evidenced improvement instead. All ten distinct areas are required. For jobMatches use SHORT ATOMIC requirement phrases copied from the JD. A supported requirement must occur verbatim (ignoring case) inside at least one of its resume quotes. If it does not, use partially_supported with the relevant exact quote, or not_evidenced with an empty array. Do not invent or relax evidence. Return null for any rewrite that is not an exact contiguous excerpt of its original.` : ""),
+        systemInstruction: SYSTEM_INSTRUCTION + (validationFeedback ? `\nVALIDATOR CORRECTION: A previous attempt was rejected (${validationFeedback}). Generate a fresh complete response. Each priority and strength MUST cite one to three exact resume substrings; if a missing section has no quote, prioritize an evidenced improvement instead. All ten distinct areas are required exactly once and every finding ID must be unique. Every high-impact finding needs an exact resume quote; omit an unsupported finding rather than inventing evidence. General reviews must have jobMatches: []. A partially_supported job match needs relevant resume evidence; not_evidenced must have an empty evidence array. A rewrite's original must also occur inside its finding's evidence quote. Do not add numbers absent from the inputs. For jobMatches use SHORT ATOMIC requirement phrases copied from the JD. A supported requirement must occur verbatim (ignoring case) inside at least one of its resume quotes. If it does not, use partially_supported with the relevant exact quote, or not_evidenced with an empty array. Do not invent or relax evidence. Return null for any rewrite that is not an exact contiguous excerpt of its original.` : ""),
         responseMimeType: "application/json", responseJsonSchema: generationSchema(schema),
         maxOutputTokens: 8192, temperature: 0.1, abortSignal: combined,
       } });
-      if (response.candidates?.[0]?.finishReason !== "STOP" || !response.text || response.text.length > 100_000) throw invalidResponse();
-      try { return JSON.parse(response.text) as unknown; } catch { throw invalidResponse(); }
+      const finish = response.candidates?.[0]?.finishReason;
+      if (finish === "MAX_TOKENS") throw invalidResponse("output-token-limit");
+      if (finish === "SAFETY" || finish === "RECITATION" || response.promptFeedback?.blockReason) throw invalidResponse("blocked-output");
+      if (finish !== "STOP") throw invalidResponse("incomplete-output");
+      if (!response.text) throw invalidResponse("empty-output");
+      if (response.text.length > 100_000) throw invalidResponse("oversized-output");
+      try { return JSON.parse(response.text) as unknown; } catch { throw invalidResponse("invalid-json"); }
     } catch (error: unknown) {
       if (signal?.aborted) throw new AiError("CANCELLED", "The request was cancelled. Provider processing may already have incurred a charge.", 499, true);
       if (deadline.aborted || (error instanceof Error && /timeout|timed out/i.test(error.message))) throw new AiError("TIMEOUT", "Gemini did not respond in time. Your text is unchanged. Retry later; a timed-out request may still be billed.", 504, true);
@@ -49,7 +55,7 @@ export function createGeminiProvider(): ResumeAiProvider {
       } catch (error) {
         // One bounded format/evidence correction only, within the SAME deadline.
         // Never retry timeouts, quota, transport, safety blocks or access failures.
-        if (attempt || !(error instanceof AiError) || error.code !== "INVALID_RESPONSE" || typeof error.cause !== "string" || !/^(schema-shape-or-bounds|non-exact-evidence|non-extractive-rewrite|introduced-number|unsupported-requirement-claim|requirement-not-in-job-evidence)/u.test(error.cause) || deadline.aborted || signal?.aborted) throw error;
+        if (attempt || !(error instanceof AiError) || error.code !== "INVALID_RESPONSE" || !validationFailure(error.cause)?.correctable || deadline.aborted || signal?.aborted) throw error;
         feedback = typeof error.cause === "string" ? error.cause : "validation failed";
       }
     }

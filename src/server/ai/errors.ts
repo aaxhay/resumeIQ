@@ -1,4 +1,5 @@
 import type { ERROR_CODES } from "../../lib/ai-review/contracts.ts";
+import { validationFailure } from "./validation-failures.ts";
 export type AiErrorCode = (typeof ERROR_CODES)[number];
 export class AiError extends Error {
   readonly code: AiErrorCode;
@@ -16,5 +17,6 @@ export function invalidResponse(reason = "unspecified"): AiError {
 }
 export function safeAiFailure(error: unknown) {
   const known = error instanceof AiError ? error : new AiError("PROVIDER_ERROR", "AI analysis could not be completed. Your text has not been changed. Try again later.", 502, true);
-  return { status: known.status, body: { ok: false as const, error: { code: known.code, message: known.message, retryable: known.retryable } } };
+  const issue = known.code === "INVALID_RESPONSE" ? validationFailure(known.cause)?.issue : undefined;
+  return { status: known.status, body: { ok: false as const, error: { code: known.code, message: known.message, retryable: known.retryable, ...(issue ? { validationIssue: issue } : {}) } } };
 }

@@ -16,16 +16,19 @@ export function validateReview(input: unknown, resume: string, job?: string): Ai
   const parsed = reviewSchema.safeParse(input);
   if (!parsed.success) throw invalidResponse(`schema-shape-or-bounds:${parsed.error.issues.map(issue => `${issue.path.join(".")}:${issue.code}`).slice(0, 5).join(",")}`);
   const data = parsed.data;
-  if (new Set(data.areas.map(area => area.area)).size !== AREAS.length || new Set(data.findings.map(f => f.id)).size !== data.findings.length) throw invalidResponse();
+  if (new Set(data.areas.map(area => area.area)).size !== AREAS.length) throw invalidResponse("incomplete-area-coverage");
+  if (new Set(data.findings.map(f => f.id)).size !== data.findings.length) throw invalidResponse("duplicate-finding-id");
   for (const item of [...data.priorities, ...data.strengths, ...data.findings]) exactQuotes(item.resumeEvidence, resume);
   for (const finding of data.findings) {
-    if (finding.impact === "high" && !finding.resumeEvidence.length) throw invalidResponse();
+    if (finding.impact === "high" && !finding.resumeEvidence.length) throw invalidResponse("missing-high-impact-evidence");
     if (finding.suggestedRewrite) {
       validateRewrite(finding.suggestedRewrite, resume);
-      if (!finding.resumeEvidence.some(quote => quote.includes(finding.suggestedRewrite!.original))) throw invalidResponse();
+      if (!finding.resumeEvidence.some(quote => quote.includes(finding.suggestedRewrite!.original))) throw invalidResponse("uncited-rewrite");
     }
   }
-  if ((!job && data.jobMatches.length) || (job && !data.jobMatches.length)) throw invalidResponse();
+  // A sparse description may contain no assessable requirements. Do not force
+  // invented matches; the job inventory will retain extracted items as unassessed.
+  if (!job && data.jobMatches.length) throw invalidResponse("unexpected-job-matches");
   for (const match of data.jobMatches) {
     exactQuotes([match.jobEvidence], job ?? ""); exactQuotes(match.resumeEvidence, resume);
     if (!normalized(match.jobEvidence).includes(normalized(match.requirement))) throw invalidResponse("requirement-not-in-job-evidence");
@@ -36,8 +39,8 @@ export function validateReview(input: unknown, resume: string, job?: string): Ai
       const supplied = ` ${normalized(match.resumeEvidence.join(" "))} `;
       if (!terms.length || terms.some(term => !supplied.includes(` ${term} `))) throw invalidResponse("unsupported-requirement-claim");
     }
-    if (match.status === "partially_supported" && !match.resumeEvidence.length) throw invalidResponse();
-    if (match.status === "not_evidenced" && match.resumeEvidence.length) throw invalidResponse();
+    if (match.status === "partially_supported" && !match.resumeEvidence.length) throw invalidResponse("missing-partial-evidence");
+    if (match.status === "not_evidenced" && match.resumeEvidence.length) throw invalidResponse("conflicting-match-evidence");
   }
   // Reject introduced numbers throughout generated assessment/recommendation prose.
   // Numbers in exact job quotes are not candidate achievements; rewrites are checked against their own original.

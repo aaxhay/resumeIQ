@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { jobAnalysisSchema } from "../job-description/analysis-contracts.ts";
 
 export const MAX_AI_TEXT = 30_000;
 export const AREAS = ["summary", "structure", "clarity", "grammar", "experience", "achievements", "skills", "projects", "repetition", "readability"] as const;
@@ -35,8 +36,10 @@ export const reviewRequestSchema = z.discriminatedUnion("mode", [
 ]);
 export type ReviewRequest = z.infer<typeof reviewRequestSchema>;
 export const ERROR_CODES = ["INVALID_REQUEST", "NOT_CONFIGURED", "PRIVACY_GATE", "BUSY", "DUPLICATE", "RATE_LIMIT", "TIMEOUT", "CANCELLED", "INVALID_RESPONSE", "PROVIDER_ERROR"] as const;
+export const VALIDATION_ISSUES = ["format", "coverage", "evidence", "rewrite", "unsupported_claim", "output_limit", "blocked", "incomplete"] as const;
+export type ValidationIssue = (typeof VALIDATION_ISSUES)[number];
 export const reviewResponseSchema = z.discriminatedUnion("ok", [
-  z.object({ ok: z.literal(true), data: reviewSchema, model: z.string(), redacted: z.boolean() }).strict(),
-  z.object({ ok: z.literal(false), error: z.object({ code: z.enum(ERROR_CODES), message: z.string(), retryable: z.boolean() }).strict() }).strict(),
+  z.object({ ok: z.literal(true), data: reviewSchema, jobAnalysis: jobAnalysisSchema.nullable(), model: z.string(), redacted: z.boolean() }).strict(),
+  z.object({ ok: z.literal(false), error: z.object({ code: z.enum(ERROR_CODES), message: z.string(), retryable: z.boolean(), validationIssue: z.enum(VALIDATION_ISSUES).optional() }).strict() }).strict(),
 ]);
 export const availabilitySchema = z.object({ configured: z.boolean(), personalDataEnabled: z.boolean() }).strict();

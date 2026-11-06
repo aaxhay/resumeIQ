@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ResumeAiProvider } from "@/server/ai/provider";
 import { reviewResponseSchema } from "@/lib/ai-review/contracts";
 import { aiJob, aiQuote, aiResume, validAiReview } from "../fixtures/ai-review";
+import { analyzeJobDescription } from "@/server/ai/job-analysis";
 
 vi.mock("server-only", () => ({}));
 const provider = vi.hoisted(() => ({
@@ -60,7 +61,7 @@ describe("AI route through real request, privacy, validation, and guard boundari
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
-    expect(await response.json()).toEqual({ ok: true, data: validAiReview(), model: provider.model, redacted: false });
+    expect(await response.json()).toEqual({ ok: true, data: validAiReview(), jobAnalysis: null, model: provider.model, redacted: false });
     expect(provider.analyzeResume).toHaveBeenCalledExactlyOnceWith(aiResume, req.signal);
     expect(provider.analyzeJobMatch).not.toHaveBeenCalled();
   });
@@ -69,9 +70,35 @@ describe("AI route through real request, privacy, validation, and guard boundari
     const req = request(input({ mode: "job-specific", jobDescription: aiJob }));
     const response = await POST(req);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, data: validAiReview(true), model: provider.model, redacted: false });
+    expect(await response.json()).toEqual({ ok: true, data: validAiReview(true), jobAnalysis: analyzeJobDescription(validAiReview(true), aiResume, aiJob), model: provider.model, redacted: false });
     expect(provider.analyzeJobMatch).toHaveBeenCalledExactlyOnceWith(aiResume, aiJob, req.signal);
     expect(provider.analyzeResume).not.toHaveBeenCalled();
+  });
+
+  it("builds job fields and unassessed requirements from the minimized submitted description", async () => {
+    const jobDescription = "Job title: Developer\nCompany: contact@example.test\nRequired skills: TypeScript, SQL\nPreferred skills: Kubernetes\nEducation:\n- Bachelor degree";
+    const data = validAiReview(true);
+    data.jobMatches[0]!.jobEvidence = "TypeScript";
+    data.jobMatches[1]!.jobEvidence = "Kubernetes";
+    provider.analyzeJobMatch.mockResolvedValue(data);
+    const response = await POST(request(input({ mode: "job-specific", jobDescription })));
+    expect(response.status).toBe(200);
+    const body = reviewResponseSchema.parse(await response.json());
+    if (!body.ok || !body.jobAnalysis) throw new Error("Expected validated job analysis");
+    expect(body.redacted).toBe(true);
+    expect(body.jobAnalysis.profile.title?.value).toBe("Developer");
+    expect(body.jobAnalysis.profile.company?.value).toBe("[email removed]");
+    expect(JSON.stringify(body)).not.toContain("contact@example.test");
+    expect(body.jobAnalysis.comparisons).toContainEqual(expect.objectContaining({ requirement: "SQL", status: "not_assessed", resumeEvidence: [] }));
+    expect(provider.analyzeJobMatch).toHaveBeenCalledTimes(1);
+    const minimizedJob = provider.analyzeJobMatch.mock.calls[0]![1];
+    for (const item of body.jobAnalysis.comparisons) {
+      expect(minimizedJob).toContain(item.jobEvidence);
+      for (const quote of item.resumeEvidence) expect(aiResume).toContain(quote);
+    }
+    for (const item of body.jobAnalysis.profile.requirements) {
+      expect(minimizedJob.slice(item.evidence.start, item.evidence.end)).toBe(item.evidence.text);
+    }
   });
 
   it.each([

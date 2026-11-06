@@ -2,7 +2,7 @@
 
 ## One application, explicit boundaries
 
-Next.js App Router + strict TypeScript, Tailwind, and shadcn/ui. The session-only MVP needs no database. The current milestone implements upload → mode selection → extraction → editable text confirmation → explicit deterministic text checks. Optional consent-based Gemini review adds general feedback and job-description evidence comparison. Extractive shortening suggestions are not applied automatically. Full generative editing and export remain future work.
+Next.js App Router + strict TypeScript, Tailwind, and shadcn/ui. The session-only MVP needs no database. The current milestone implements upload → mode selection → extraction → editable text confirmation → explicit deterministic text checks. Optional consent-based Gemini review adds a grouped results dashboard, explicit job-description fields, and requirement-level evidence comparison. Extractive shortening suggestions are not applied automatically. Full generative editing and export remain future work.
 
 ```text
 src/app/                         Server pages and thin Node route handlers
@@ -14,6 +14,7 @@ src/lib/config/                  Pure environment validator
 src/server/resume-processing/    Bounded requests, validation, isolated parsers, normalization
 src/server/config/               Lazy server-only configuration
 src/lib/ai-review/               Shared strict schemas and contact minimization
+src/lib/job-description/         Pure explicit-field extraction and provenance contracts
 src/server/ai/                   Gemini adapter, provider interface, evidence validation, guards
 src/server/documents/            Reserved DOCX export
 src/server/data/                 Reserved optional persistence
@@ -41,7 +42,7 @@ The analyzer imports only browser-safe contracts/helpers and Zod; it can also ru
 | --- | --- | --- |
 | `POST /api/resume/extract` | Implemented | One PDF/DOCX or `{text}` → text/warnings/stats or typed error |
 | `GET /api/reviews` | Implemented | Configuration-presence and operator privacy-policy booleans only |
-| `POST /api/reviews` | Implemented | Confirmed minimized previews, consent, general/job mode → validated feedback or safe error |
+| `POST /api/reviews` | Implemented | Confirmed minimized previews, consent, general/job mode → validated feedback and nullable jobAnalysis or safe error |
 | `POST /api/resume/export` | Planned | User-approved structured resume → DOCX |
 
 The analysis endpoint must repeat text, mode, and job-description validation and require consent. A browser confirmation flag is not proof of trusted content. Gemini must receive supplied documents as untrusted data, never instructions. Validate model output; do not fabricate achievements or ATS guarantees. Invalidate analysis when text/preferences change, and export when approved content changes.
