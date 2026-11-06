@@ -13,7 +13,7 @@ const ERRORS = {
 } as const;
 
 /** Remounted on every workspace revision: stale downloads are cancelled, never offered as current. */
-export function ResumeDocxExport({ text }: { text: string }) {
+export function ResumeDocxExport({ text, onDownloadRequested }: { text: string; onDownloadRequested: () => void }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
@@ -58,6 +58,7 @@ export function ResumeDocxExport({ text }: { text: string }) {
       document.body.append(anchor);
       try { anchor.click(); } finally { anchor.remove(); }
       setStatus("Download requested. Check your browser’s downloads for improved-resume.docx. If saving was blocked or cancelled, use Download DOCX again. Your original is unchanged.");
+      onDownloadRequested();
     } catch {
       if (current.current === controller) setError("The DOCX download could not be completed or timed out. Your draft is unchanged. Check your connection and try again when ready.");
     } finally {

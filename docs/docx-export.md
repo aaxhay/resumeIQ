@@ -8,6 +8,12 @@ The button sends a snapshot of the preview to this application's server, not to 
 
 Workspace revisions remount the export control and abort any pending browser request, so an obsolete result cannot be offered as the current draft. Requests are not retried automatically. The button is disabled during generation, and failures preserve the draft and focus a safe error. Success says **Download requested**, not saved: browser/user cancellation or disk failure after handing off the file cannot be reliably observed from the page. Users can check browser downloads and retry explicitly.
 
+## After download: completion screen
+
+After validated bytes are handed to the browser, the review switches to `/review#download-complete` with **Your DOCX download has started**. This is a same-document completion view, not a route change that destroys the draft. The review subtree remains mounted but hidden, retaining the original, accepted decisions, saved manual suggestions, unsaved wording buffers, and download URL lifetime. Browser back/forward and **Return to review** preserve this local work. A fresh visit to the fragment does not fabricate a completed download or restore lost state.
+
+The completion screen provides **Return to review**, **View account history (new tab)**, and **Start another review**, which requires explicit confirmation before discarding local work. It never automatically saves account history or claims that saving to disk finished. Account summaries still require separate preview/consent and cannot restore the editing draft. Failed or stale exports do not show completion. Refreshing/closing the page still loses the memory-only workspace.
+
 ## Template and preservation rules
 
 - Single-column Word document using standard editable paragraphs and list numbering. No images, tables, decorative graphics, embedded objects, or custom layout engine.

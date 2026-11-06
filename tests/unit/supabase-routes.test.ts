@@ -51,8 +51,11 @@ async function failure(response: Response, status: number, code: string) {
   expect(response.status).toBe(status);
   expect(response.headers.get("cache-control")).toBe("private, no-store");
   expect(response.headers.get("vary")).toBe("Cookie");
+  expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   const body: unknown = await response.json();
-  expect(body).toMatchObject({ ok: false, error: { code } });
+  expect(body).toEqual({ ok: false, error: { code, message: code === "HISTORY_NOT_READY"
+    ? "Saved history requires database setup. The operator must apply the ResumeIQ Supabase migration and configure retention. Your local review is unchanged."
+    : "The optional account or saved-history operation could not be completed. Your local review is unchanged." } });
   expect(JSON.stringify(body)).not.toContain("PRIVATE_DETAIL");
 }
 
@@ -100,6 +103,35 @@ describe("server-only optional authentication", () => {
     expect(await (await account.GET()).json()).toEqual({ ok: true, configured: true, historyEnabled: true, user: { email: user.email } });
     expect(mock.auth.getUser).toHaveBeenCalledOnce();
     expect(mock.create.mock.calls[0]?.slice(0, 2)).toEqual([config.NEXT_PUBLIC_SUPABASE_URL, publicKey]);
+    expect(mock.client.from).toHaveBeenCalledExactlyOnceWith("resume_reviews");
+    expect(mock.query.select).toHaveBeenCalledExactlyOnceWith("id,resume_suggestions(id)");
+    expect(mock.query.limit).toHaveBeenCalledExactlyOnceWith(0);
+    expect(mock.client.rpc).not.toHaveBeenCalled();
+  });
+  it.each(["PGRST205", "PGRST200", "42P01", "PGRST202", "42883"])("preserves verified identity but disables history when readiness reports %s", async code => {
+    mock.query.limit.mockResolvedValue({ data: null, error: { code, message: "PRIVATE_DETAIL", details: "PRIVATE_DETAIL", hint: "PRIVATE_DETAIL" } });
+    const response = await account.GET();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.get("vary")).toBe("Cookie");
+    expect(await response.json()).toEqual({ ok: true, configured: true, historyEnabled: false, historySetupRequired: true, user: { email: user.email } });
+    expect(mock.auth.getUser).toHaveBeenCalledOnce();
+    expect(mock.query.select).toHaveBeenCalledExactlyOnceWith("id,resume_suggestions(id)");
+    expect(mock.query.limit).toHaveBeenCalledExactlyOnceWith(0);
+    expect(mock.client.rpc).not.toHaveBeenCalled();
+  });
+  it("does not probe history when disabled, while retaining verified identity", async () => {
+    vi.stubEnv("SUPABASE_HISTORY_ENABLED", "false");
+    expect(await (await account.GET()).json()).toEqual({ ok: true, configured: true, historyEnabled: false, user: { email: user.email } });
+    expect(mock.auth.getUser).toHaveBeenCalledOnce();
+    expect(mock.client.from).not.toHaveBeenCalled();
+    expect(mock.client.rpc).not.toHaveBeenCalled();
+  });
+  it("does not probe history or retain identity when verification fails", async () => {
+    mock.auth.getUser.mockResolvedValue({ data: { user }, error: { message: "PRIVATE_DETAIL" } });
+    expect(await (await account.GET()).json()).toEqual({ ok: true, configured: true, historyEnabled: true, user: null });
+    expect(mock.client.from).not.toHaveBeenCalled();
+    expect(mock.client.rpc).not.toHaveBeenCalled();
   });
   it.each([null, { ...user, is_anonymous: true }, { ...user, email_confirmed_at: null }])("rejects absent, anonymous or unconfirmed identities %#", async identity => {
     mock.auth.getUser.mockResolvedValue({ data: { user: identity }, error: null });
@@ -207,6 +239,30 @@ describe("saved summary server routes", () => {
     await failure(await history.GET(), 503, "STORAGE_ERROR");
     mock.client.rpc.mockResolvedValue({ data: user.id, error: null });
     await failure(await history.POST(request("/api/review-history", payload())), 503, "STORAGE_ERROR");
+  });
+  it.each([
+    ["list", "PGRST205"], ["list", "42P01"], ["list", "PGRST200"],
+    ["save", "PGRST202"], ["save", "42883"], ["save", "42P01"],
+    ["delete", "PGRST205"], ["delete", "42P01"],
+  ] as const)("returns safe setup guidance for %s failure %s", async (operation, code) => {
+    const result = { data: null, error: { code, message: "PRIVATE_DETAIL", details: "PRIVATE_DETAIL", hint: "PRIVATE_DETAIL" } };
+    mock.query.limit.mockResolvedValue(result);
+    mock.client.rpc.mockResolvedValue(result);
+    mock.query.maybeSingle.mockResolvedValue(result);
+    const response = operation === "list" ? await history.GET()
+      : operation === "save" ? await history.POST(request("/api/review-history", payload()))
+      : await deletion.DELETE(request(`/api/review-history/${id}`, {}, "DELETE"), { params: Promise.resolve({ id }) });
+    await failure(response, 503, "HISTORY_NOT_READY");
+  });
+  it.each(["42501", "23505", "PGRST301", "UNKNOWN", undefined])("keeps ordinary storage failure %s distinct from missing schema regardless of diagnostic text", async code => {
+    const result = { data: null, error: { code, message: 'PRIVATE_DETAIL: relation "resume_reviews" does not exist; PGRST205', details: "PRIVATE_DETAIL: save_resume_review missing", hint: "PRIVATE_DETAIL" } };
+    mock.query.limit.mockResolvedValue(result);
+    mock.client.rpc.mockResolvedValue(result);
+    mock.query.maybeSingle.mockResolvedValue(result);
+    await failure(await account.GET(), 503, "STORAGE_ERROR");
+    await failure(await history.GET(), 503, "STORAGE_ERROR");
+    await failure(await history.POST(request("/api/review-history", payload())), 503, "STORAGE_ERROR");
+    await failure(await deletion.DELETE(request(`/api/review-history/${id}`, {}, "DELETE"), { params: Promise.resolve({ id }) }), 503, "STORAGE_ERROR");
   });
   it("bounds JSON body size", async () => {
     await failure(await history.POST(request("/api/review-history", { resume: "a".repeat(400_001) })), 413, "INVALID_REQUEST");

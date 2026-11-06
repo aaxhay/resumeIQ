@@ -29,6 +29,14 @@ The configured URL and publishable key reached the hosted Auth settings endpoint
 5. After schema and cleanup verification, explicitly set `SUPABASE_HISTORY_ENABLED=true` and restart the application. Without this flag history stays disabled; invalid/missing configuration leaves anonymous review operational. A flag is an operator assertion, not automatic migration or cleanup verification.
 6. Using authorized synthetic test identities, verify signup/confirmation/sign-in, save/list/delete, two-user isolation, expired-row cleanup, and sign-out against the hosted project before calling the hosted feature ready. These live authenticated checks remain pending here. Test only synthetic content until the project's privacy/retention and deployment settings have been reviewed.
 
+## Troubleshooting: history is not saved
+
+A fresh metadata-only probe on **2026-11-07** found `SUPABASE_HISTORY_ENABLED=true`, but all three required tables (`profiles`, `resume_reviews`, `resume_suggestions`) still returned HTTP 404 / `PGRST205`. No database connection was configured for applying SQL. **Turning on the flag does not create the schema.** Complete steps 1–2 above before enabling history, then verify the authenticated flow. No hosted SQL or retention job was applied during this follow-up.
+
+For a verified signed-in user with the flag enabled, `/api/account` now performs a zero-row table/relationship readiness query. Missing schema disables the save UI and returns `historySetupRequired: true` while retaining identity/sign-out. Missing tables, relationships, or save RPCs encountered during history operations return the safe `HISTORY_NOT_READY` code rather than a generic failure. Other database failures remain `STORAGE_ERROR`; raw SQL diagnostics are not exposed. This readiness check does **not** verify Cron, backup retention, every database object, or live cross-user isolation. Those remain operator checks. Once setup is complete, return from another tab to trigger account revalidation or reload the account page; preserve or download local work before any full review-page reload.
+
+Downloading DOCX never automatically persists a summary. Return from the completion screen, open **Save review summary**, sign in, inspect the preview, and give storage consent. Account history opens in a new tab so it does not discard the review draft.
+
 ## Schema and ownership
 
 | Table | Columns | Purpose |
@@ -60,6 +68,8 @@ Reviews and their children become unreadable by authenticated users at `created_
 User-requested deletion removes the selected database row and children immediately on successful commit. It does not delete browser-local drafts, downloaded files, or Google's separately processed data. A minimal profile and Auth account remain after all summaries are deleted. Full account deletion is an administrative Supabase Auth action in this phase, not a misleading nonfunctional UI control. An operator must support that request; deleting the Auth user cascades application rows. The implementation does not promise provider backup deletion or zero retention: review Supabase backup/PITR/log policies and document the applicable retention separately. Never log resume/summary text, passwords, confirmation codes, or tokens.
 
 ## Verification and remaining limits
+
+Final `npm run check` passed on **2026-11-07**: **710 unit/integration tests in 23 files**, **120 desktop/mobile browser/API tests**, zero-warning lint, strict TypeScript, and production build. This includes 47 SDK-boundary server/config/projection checks, 55 database/RLS checks, and 30 account/history browser executions. An earlier full run was intentionally stopped after final frontend changes landed; this passing run rebuilt and tested the final code. No live AI call was needed for this milestone.
 
 - Production migration executed against real embedded PostgreSQL using PGlite, test-only Auth helpers, and non-superuser API roles: **55 RLS/database tests passed**. Includes unauthorized access, two-user isolation, forgery, direct insert limits, immutable columns, atomic rollback, idempotency, expiry, physical purge, function privileges, and deletion cascades.
 - Server/config/projection tests mock only SDK/cookie boundaries and do not send signup emails or create hosted users. They cover auth validation, anonymous compatibility, verified ownership, strict projection, credential rejection, origin/body bounds, secure cookie writes, safe errors, disabled history, and confirmed deletion.

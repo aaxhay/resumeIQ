@@ -1,6 +1,6 @@
 import { accountActionResponseSchema, accountActionSchema, accountSchema } from "@/lib/saved-reviews/contracts";
 import { configuration, createSupabaseClient } from "@/server/supabase/client";
-import { AccountError, accountFailure, privateHeaders } from "@/server/supabase/errors";
+import { AccountError, accountFailure, privateHeaders, historySetupMissing, historyStorageError } from "@/server/supabase/errors";
 import { acquireAccountOperation } from "@/server/supabase/guard";
 import { JsonRequestError, readJsonRequest } from "@/server/http/json-request";
 
@@ -14,7 +14,16 @@ export async function GET(): Promise<Response> {
     const client = await createSupabaseClient();
     const { data, error } = await client.auth.getUser();
     const user = !error && data.user && !data.user.is_anonymous && data.user.email_confirmed_at && data.user.email ? { email: data.user.email } : null;
-    return Response.json(accountSchema.parse({ ok: true, configured: true, historyEnabled: config.historyEnabled, user }), { headers: privateHeaders });
+    let setupRequired = false;
+    if (user && config.historyEnabled) {
+      // Empty, authorized query validates table/relationship availability without fetching content.
+      const readiness = await client.from("resume_reviews").select("id,resume_suggestions(id)").limit(0);
+      if (readiness.error) {
+        if (historySetupMissing(readiness.error)) setupRequired = true;
+        else throw historyStorageError(readiness.error);
+      }
+    }
+    return Response.json(accountSchema.parse({ ok: true, configured: true, historyEnabled: config.historyEnabled && !setupRequired, ...(setupRequired ? { historySetupRequired: true } : {}), user }), { headers: privateHeaders });
   } catch (error) { return accountFailure(error); } finally { release?.(); }
 }
 export async function POST(request: Request): Promise<Response> {

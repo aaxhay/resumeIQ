@@ -26,6 +26,9 @@ No AI feedback is shown. Check the previews, then use Retry Gemini review to mak
 16. **Optional Supabase (summary; requested 2026-11-06).** “Integrate Supabase only after the complete resume-review workflow is functional.” Use PostgreSQL, optional Auth and saved history, and temporary storage only if genuinely needed; backend setup must not block the core product. Keep profiles/reviews/suggestions minimal, avoid unnecessary full-resume persistence, enable RLS and owner isolation, authorize on the server, validate every input, never trust client user IDs or expose service-role keys, and never store API credentials in records. Establish retention and deletion. Signup must remain optional before a first review. Test anonymous/authenticated flows, isolation, unauthorized access, RLS, and deletion. If time is limited, document schema/security and defer persistence. Use Claude's Frontend Design guidance and the supplied UI UX Pro Max skill reference.
 17. **Configuration update (verbatim; 2026-11-06).** “added supabase credenitals in .env.local now you can proceed with your work” No credential values are recorded here.
 
+18. **History failure and download navigation (verbatim; 2026-11-07).** “history is not getting saved and as the user download the docs file redirect page accordingly”
+19. **Download destination (verbatim selection; 2026-11-07).** “Completion screen (Recommended)”. Selected description: “Show download confirmation with options to return to the preserved draft, view account history, or start another review.” The choice followed disclosure that leaving the page loses the memory-only draft and the browser cannot reliably confirm completion of saving to disk.
+
 ## Standing implementation requirements
 
 - Strict TypeScript; no `any`; validate external inputs and use typed contracts.

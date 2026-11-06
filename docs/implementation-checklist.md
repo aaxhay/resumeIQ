@@ -128,9 +128,21 @@ See [Supabase setup and security](supabase.md).
 - [x] Add minimal projected summaries/excerpts, verified owner filters, strict input/result contracts, bounded same-origin requests, private uncached responses, and safe failures.
 - [x] Execute migration/RLS/retention/deletion tests against embedded PostgreSQL: 55 checks; SDK-boundary server/config tests: 47 checks. Lint and strict types passed for this focused gate.
 - [x] Verify hosted Auth settings connectivity using configured publishable key without displaying credentials; tables are absent, no hosted users or emails created.
+- [x] Pass final `npm run check` on 2026-11-07: 710 unit/integration tests, 120 desktop/mobile browser/API tests, lint, strict types, and production build. Inspect desktop/320px account/save screens and verify actual-app anonymous review plus disabled-history behavior.
+- [x] Recheck audits and configured-value exposure: zero runtime audit findings and zero configured-value matches in changed files/browser assets; thirteen existing tooling findings remain.
 - [ ] Apply reviewed migration to the intended hosted project; install and monitor physical cleanup, then enable history explicitly.
 - [ ] Verify hosted signup/confirmation/sign-in/save/list/delete and two-user isolation using authorized synthetic identities.
 - [ ] Verify production SMTP, Auth protections, distributed rate limits, provider backup retention, and deployment behavior.
+
+## Follow-up — history setup diagnostics and download completion (2026-11-07)
+
+- [x] Identify the hosted blocker: history flag enabled but all three required tables return `PGRST205`; do not claim hosted saving is repaired without applying SQL.
+- [x] Add safe `HISTORY_NOT_READY` errors and a verified-user zero-row readiness query; preserve identity/sign-out while hiding unavailable saving controls.
+- [x] Add same-document DOCX completion, return to the preserved draft, account history in a new tab, and confirmed local reset; never automatically persist a summary.
+- [x] Verify the running development app with synthetic upload, mocked AI, real export/download/text roundtrip, accepted/saved/unsaved draft preservation, browser back/forward, explicit retry, keyboard focus, and reset confirmation. Inspect desktop/320px screenshots; fix the narrow-screen reset-button overflow found by the first run.
+- [x] Scan 44 changed/new files, 39 staged blobs, and 14 production browser assets: zero configured-value matches; preserve the user's index and ignored local configuration.
+- [ ] Finish the rebuilt full quality gate for this follow-up.
+- [ ] Hosted SQL, retention scheduling, and live authenticated save/list/delete remain pending operator setup above.
 
 ## Phase 4 — Release hardening (day 2, remaining)
 

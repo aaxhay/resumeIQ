@@ -14,6 +14,7 @@ import { SetupConfirmation } from "./setup-confirmation";
 import { DeterministicReview } from "./deterministic-review";
 import { AiReview } from "./ai-review";
 import { ResumeImprovement } from "./resume-improvement";
+import { DownloadCompletion } from "./download-completion";
 import { createImprovementSession } from "@/lib/resume-improvement/editor";
 import type { ImprovementSession } from "@/lib/resume-improvement/contracts";
 import type { AiReview as AiReviewData } from "@/lib/ai-review/contracts";
@@ -24,6 +25,40 @@ export function ReviewSetupForm() {
   const [replacement, setReplacement] = useState<ImprovementSession>();
   const [improvementError, setImprovementError] = useState("");
   const [confirmReset, setConfirmReset] = useState(false);
+  const [downloadComplete, setDownloadComplete] = useState(false);
+  const hasDownloaded = useRef(false);
+  const workspacePanel = useRef<HTMLDivElement>(null);
+  const focusWorkspace = useRef(false);
+  useEffect(() => {
+    const onBackOrForward = () => {
+      const show = hasDownloaded.current && window.location.hash === "#download-complete";
+      if (!show) focusWorkspace.current = true;
+      setDownloadComplete(show);
+    };
+    window.addEventListener("popstate", onBackOrForward);
+    return () => window.removeEventListener("popstate", onBackOrForward);
+  }, []);
+  useEffect(() => {
+    if (!downloadComplete && focusWorkspace.current) {
+      focusWorkspace.current = false;
+      workspacePanel.current?.focus();
+    }
+  }, [downloadComplete]);
+  function downloadRequested() {
+    hasDownloaded.current = true;
+    // A same-document route avoids unmounting the draft or revoking its download URL.
+    const destination = new URL(window.location.href);
+    destination.hash = "download-complete";
+    window.history.pushState(window.history.state, "", destination);
+    setDownloadComplete(true);
+  }
+  function returnToReview() {
+    const destination = new URL(window.location.href);
+    destination.hash = "";
+    window.history.replaceState(window.history.state, "", destination);
+    focusWorkspace.current = true;
+    setDownloadComplete(false);
+  }
   const replacementPanel = useRef<HTMLDivElement>(null);
   useEffect(() => { if (replacement) replacementPanel.current?.focus(); }, [replacement]);
 
@@ -67,6 +102,8 @@ export function ReviewSetupForm() {
     if (result === "error") errorPanel.current?.focus();
   }
   function startOver() {
+    hasDownloaded.current = false;
+    if (downloadComplete) returnToReview();
     focusAfterReset.current = true;
     setWorkspace(undefined); setReplacement(undefined); setImprovementError(""); setConfirmReset(false);
     setup.reset();
@@ -77,8 +114,9 @@ export function ReviewSetupForm() {
     if (result === "job-description") jobInput.current?.focus();
     if (result === "success") confirmation.current?.focus();
   }
-  return (
-    <div className="min-w-0 space-y-6">
+  return (<>
+    {downloadComplete && <DownloadCompletion onReturn={returnToReview} onStartOver={startOver} />}
+    <div hidden={downloadComplete} className="min-w-0 space-y-6">
       <Card>
         <form noValidate onSubmit={submit} aria-label="Resume review setup">
           <fieldset disabled={setup.processing} className="min-w-0 space-y-8 disabled:opacity-70">
@@ -134,9 +172,9 @@ export function ReviewSetupForm() {
       {improvementError && <Notice role="alert" tone="error">{improvementError}</Notice>}
       {replacement && <Notice ref={replacementPanel} tabIndex={-1}>
         <p className="font-semibold">Replace the current improvement workspace?</p><p className="mt-2">This discards its local edits, rejected suggestions, and undo history. Copy anything you want to keep first. The existing draft remains untouched until you confirm.</p>
-        <div className="mt-3 flex flex-wrap gap-3"><Button type="button" onClick={() => { setWorkspace(current => ({ initial: replacement, key: (current?.key ?? 0) + 1 })); setReplacement(undefined); }}>Replace improvement workspace</Button><Button type="button" variant="outline" onClick={() => setReplacement(undefined)}>Keep current workspace</Button></div>
+        <div className="mt-3 flex flex-wrap gap-3"><Button type="button" onClick={() => { hasDownloaded.current = false; setWorkspace(current => ({ initial: replacement, key: (current?.key ?? 0) + 1 })); setReplacement(undefined); }}>Replace improvement workspace</Button><Button type="button" variant="outline" onClick={() => setReplacement(undefined)}>Keep current workspace</Button></div>
       </Notice>}
-      {workspace && <ResumeImprovement key={workspace.key} initialSession={workspace.initial} />}
+      {workspace && <div ref={workspacePanel} tabIndex={-1} className="rounded-xl"><ResumeImprovement key={workspace.key} initialSession={workspace.initial} onDownloadRequested={downloadRequested} /></div>}
     </div>
-  );
+  </>);
 }

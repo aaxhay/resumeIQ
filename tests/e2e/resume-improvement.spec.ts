@@ -16,7 +16,7 @@ const manualRevised = "Supported peer reviews and documented development practic
 const rejectedOriginal = "Created a guide that enabled independent onboarding.";
 const rejectedRevision = "Enabled independent onboarding by creating a guide.";
 const canonical = (text: string) => text.split(/\r?\n/u).map(line => line.trim().replace(/^[-*•]\s+/u, "")).filter(Boolean).join("\n");
-async function downloadText(page: Page) {
+async function downloadText(page: Page, stayOnCompletion = false) {
   const downloadEvent = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download DOCX", exact: true }).click();
   const download = await downloadEvent;
@@ -24,7 +24,16 @@ async function downloadText(page: Page) {
   expect(await download.failure()).toBeNull();
   const path = await download.path();
   if (!path) throw new Error("Expected local synthetic download");
-  return (await extractRawText({ buffer: await readFile(path) })).value;
+  const text = (await extractRawText({ buffer: await readFile(path) })).value;
+  await expect(page).toHaveURL(/\/review#download-complete$/u);
+  await expect(page.getByRole("heading", { name: "Your DOCX download has started" })).toBeFocused();
+  await expect(workspace(page)).toBeHidden();
+  if (!stayOnCompletion) {
+    await page.getByRole("button", { name: "Return to review", exact: true }).press("Enter");
+    await expect(page).toHaveURL(/\/review$/u);
+    await expect(workspace(page)).toBeVisible();
+  }
+  return text;
 }
 // Extend the shared synthetic resume, keeping its citations and every factual qualifier.
 const extendedResume = aiResume.replace("EXPERIENCE\n", `EXPERIENCE\n${safeOriginal}\n${manualOriginal}\n`);
@@ -230,6 +239,66 @@ for (const mode of ["general", "job-specific"] as const) {
   });
 }
 
+test("download completion preserves local work through back, forward and return, and confirms reset", async ({ page }, testInfo) => {
+  const { original, requests, errors } = await start(page);
+  const persistenceRequests: string[] = [];
+  page.on("request", request => { if (request.url().includes("/api/review-history")) persistenceRequests.push(request.method()); });
+  await accept(card(page, "safe")).click();
+  await saveManual(page, "manual", manualRevised);
+  await card(page, "reject").getByRole("button", { name: "Edit wording" }).click();
+  const buffer = card(page, "reject").getByRole("textbox", { name: "Edit suggested text" });
+  await buffer.fill("An unsaved local wording buffer");
+  const expected = original.replace(safeOriginal, safeRevised);
+  expect(canonical(await downloadText(page, true))).toBe(canonical(expected));
+  const completion = page.getByTestId("download-completion");
+  await expect(completion).toContainText("Downloading does not automatically save account history");
+  const account = completion.getByRole("link", { name: "View account history (new tab)" });
+  await expect(account).toHaveAttribute("href", "/account");
+  await expect(account).toHaveAttribute("target", "_blank");
+  await expect(account).toHaveAttribute("rel", "noopener noreferrer");
+  for (const [label, width] of [["desktop", 1280], ["mobile", 320]] as const) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+    await completion.screenshot({ path: testInfo.outputPath(`download-completion-${label}.png`) });
+  }
+  await page.goBack();
+  await expect(completion).toHaveCount(0);
+  await expect(preview(page)).toHaveValue(expected);
+  await expect(buffer).toHaveValue("An unsaved local wording buffer");
+  await page.goForward();
+  await expect(completion).toBeVisible();
+  await completion.getByRole("button", { name: "Start another review", exact: true }).press("Enter");
+  const reset = completion.getByRole("group", { name: "Confirm another review" });
+  await expect(reset.getByRole("button", { name: "Discard local draft and start another review" })).toBeFocused();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+  await reset.getByRole("button", { name: "Keep this review" }).press("Enter");
+  await expect(reset).toHaveCount(0);
+  await completion.getByRole("button", { name: "Return to review", exact: true }).press("Enter");
+  await expect(preview(page)).toHaveValue(expected);
+  await expect(buffer).toHaveValue("An unsaved local wording buffer");
+  await expect(card(page, "manual").getByTestId("suggested-text")).toHaveText(manualRevised);
+  await expect(page.getByRole("checkbox", { name: /I consent to transferring these previews to Google/ })).toBeChecked();
+  await assertOriginal(page, original);
+  expect(canonical(await downloadText(page, true))).toBe(canonical(expected));
+  await completion.getByRole("button", { name: "Start another review", exact: true }).click();
+  await reset.getByRole("button", { name: "Discard local draft and start another review" }).press("Enter");
+  await expect(page).toHaveURL(/\/review$/u);
+  await expect(workspace(page)).toHaveCount(0);
+  await expect(editor(page)).toHaveCount(0);
+  await expect(page.getByTestId("ai-review-results")).toHaveCount(0);
+  await expect(page.getByLabel("Choose resume file")).toBeFocused();
+  expect(persistenceRequests).toEqual([]);
+  expect(requests).toHaveLength(1);
+  expect(errors).toEqual([]);
+});
+
+test("a fresh completion fragment cannot fabricate a successful download", async ({ page }) => {
+  await page.goto("/review#download-complete");
+  await expect(page.getByTestId("download-completion")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Extract resume text", exact: true })).toBeVisible();
+  await expect(workspace(page)).toHaveCount(0);
+});
+
 test("duplicate evidence requires an explicit occurrence and edits only the chosen location", async ({ page }) => {
   const { original, requests, errors } = await start(page, { text: `${extendedResume}\n${safeOriginal}` });
   const item = card(page, "safe");
@@ -325,6 +394,8 @@ test("export preserves contact details, special characters and empty/unknown sec
   expect(extracted).toContain("CERTIFICATIONS");
   expect(extracted).not.toContain(manualRevised);
   expect(extracted).not.toContain("UNSAVED_DRAFT_NOT_FOR_EXPORT");
+  await expect(card(page, "reject").getByRole("textbox", { name: "Edit suggested text" })).toHaveValue("UNSAVED_DRAFT_NOT_FOR_EXPORT");
+  await expect(card(page, "manual").getByTestId("suggested-text")).toHaveText(manualRevised);
   await assertOriginal(page, original);
   expect(requests).toHaveLength(1);
 });
@@ -352,6 +423,8 @@ test("export handles server, network and invalid-file failures without losing th
     await expect(preview(page)).toHaveValue(expected);
     await expect(button).toBeEnabled();
     expect(attempts).toBe(i + 1);
+    await expect(page.getByTestId("download-completion")).toHaveCount(0);
+    await expect(page).toHaveURL(/\/review$/u);
   }
   await page.unroute("**/api/resume/export");
   expect(canonical(await downloadText(page))).toBe(canonical(expected));
@@ -379,6 +452,8 @@ test("workspace changes cancel stale export and prevent duplicate download reque
   release();
   await page.unrouteAll({ behavior: "wait" });
   expect(downloads).toEqual([]);
+  await expect(page.getByTestId("download-completion")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/review$/u);
   const extracted = await downloadText(page);
   expect(canonical(extracted)).toBe(canonical(original.replace(safeOriginal, safeRevised)));
   expect(downloads).toEqual([EXPORT_FILENAME]);
