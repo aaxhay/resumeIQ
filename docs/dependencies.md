@@ -1,0 +1,84 @@
+# Dependencies and compatibility
+
+Checked against official documentation and live npm metadata on **2026-11-06** before installation. Registry `latest` can differ from published tutorials; the exact installed versions and transitive graph are recorded in `package.json` and `package-lock.json`.
+
+## Installed foundation
+
+| Dependency | Pin | Compatibility / purpose |
+| --- | --- | --- |
+| Next.js | 16.4.5 | App Router; Node >=20.9; React 19 peer supported |
+| React / React DOM | 19.3.1 | Matching stable versions |
+| TypeScript | 5.9.3 | Strict mode; intentionally below typescript-eslint's `<6.1.0` peer ceiling |
+| Tailwind / PostCSS plugin | 4.3.4 | Tailwind v4 CSS import and `@tailwindcss/postcss` |
+| PostCSS | 8.5.32 | CSS build pipeline |
+| shadcn | 4.23.0 | CLI and CSS at build time; moved to devDependencies after generation |
+| Base UI | 1.9.0 | Generated shadcn base-nova primitives |
+| Zod | 4.6.7 | Runtime boundary validation |
+| Vitest | 5.1.0 | Node ^22.12 / ^24 / >=26; Node 24 satisfies this |
+| Playwright test | 1.65.0 | Node >=20; Chromium installed for desktop/mobile checks |
+| ESLint | 9.39.5 | Compatibility exception; see below |
+| eslint-config-next | 16.4.5 | Matches Next version; includes TypeScript lint rules |
+| server-only | 0.0.1 | Next server/client import guard |
+
+Generated UI utilities: `class-variance-authority` 0.7.1, `cn` 0.5.2, `lucide-react` 1.70.0, `tw-animate-css` 1.4.0. Types: `@types/node` 24.19.2 and React/React DOM types 19.3.0. No explicit `any` in project code.
+
+The local runtime is Node 24.20.0 / npm 11.19.0. Project engines deliberately target Node 24 and npm 11 to reduce environment drift. `.npmrc` enables exact saves and engine checks. Build dependencies must be installed for `npm run build`; production pruning can happen **after** building.
+
+## Extraction dependencies (installed 2026-11-06)
+
+| Package | Exact version | Purpose |
+| --- | --- | --- |
+| `pdf-parse` | 2.4.5 | Node 24-supported v2 `PDFParse` API; cleanup via `destroy()` |
+| `mammoth` | 1.13.0 | DOCX conversion with external access/styles disabled; HTML consumed only on server, never rendered |
+| `yauzl` | 3.4.0 | Lazy, bounded ZIP validation; explicit CRC checks via Node 24 `zlib.crc32` |
+| `htmlparser2` | 12.0.0 | Non-rendering XML inspection and converter HTML-to-text |
+| `fast-xml-parser` | 5.12.0 | XML syntax validation, with separate entity/DTD rejection |
+| `@types/yauzl` | 3.4.0 | Development-only TypeScript declarations |
+| `docx` | 9.15.2 | Development-only synthetic DOCX fixtures; export is not implemented |
+| `pdf-lib` | 1.17.1 | Development-only synthetic PDF fixtures |
+
+Runtime modules are loaded by a separate Node 24 process, not bundled into browser code. See `extraction.md` for full-source deployment requirements and compatibility limits.
+
+## Deliberately deferred packages
+
+Candidate pins from earlier metadata checks, **not installed or integration-tested**. Recheck before implementing.
+
+| Package | Checked version | Node engine | Decision |
+| --- | --- | --- | --- |
+| `@google/genai` | 3.0.0 | >=22 | Maintained Google SDK; future analysis only |
+| `@supabase/supabase-js` | 2.119.0 | >=22 | Unneeded for the memory-only MVP |
+
+Model availability is not established by SDK compatibility. `.env.example` requires an explicitly selected Gemini model; no credentialed model request has been made. Parser bundling and resource behavior must be validated in the actual deployment environment.
+
+## Tooling compatibility exception
+
+The checked latest TypeScript was 7.0.2, but `typescript-eslint` 8.72.1 declares TypeScript `>=4.8.4 <6.1.0`. We pinned stable 5.9.3 rather than forcing incompatible peers.
+
+The checked latest ESLint was 10.14.0. Next's dependency `eslint-plugin-react` 7.37.5 declares support only through ESLint 9.7+. We pinned 9.39.5, which installs with an **unsupported-version deprecation warning**. This is a documented tooling compromise, not an assertion that ESLint 9 is maintained. Revisit when the React plugin supports ESLint 10, or deliberately migrate the lint configuration with full regression checks. Do not use `--legacy-peer-deps` to hide incompatibilities.
+
+## Security audit snapshot
+
+Audit rerun after installing extraction dependencies on 2026-11-06 (unchanged from foundation):
+
+- `npm audit --omit=dev`: **0 reported vulnerabilities**.
+- Full `npm audit`: **13 affected dependency entries — 2 low, 11 moderate; no high or critical**. These are development/build tooling dependencies, not 13 independent root vulnerabilities.
+- Root advisories: `minimatch` globparts amplification ([GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)) through TypeScript ESLint and shadcn/ts-morph; `deepmerge` prototype poisoning ([GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4)) through shadcn registry tooling.
+- shadcn initialization initially placed its CLI in production dependencies. It is now development-only because its CLI/CSS is needed during generation/build, not request handling.
+- npm proposes downgrading `eslint-config-next` to 15.5.29 and shadcn to 1.0.0. Those changes conflict with the chosen Next version/generated style. No blind force fix or untested cross-major override was applied.
+
+This is **not a clean full audit** and not a security certification. Keep untrusted input out of tooling/configuration; use only trusted component registries. Resolve or explicitly review these exceptions before production release; rerun audits whenever dependencies change. Build-time exposure still matters even when production-only audit is clean.
+
+## Official sources consulted
+
+- [Next.js installation and requirements](https://nextjs.org/docs/app/getting-started/installation) — manual App Router setup; `next build` no longer runs lint.
+- [Tailwind with Next.js](https://tailwindcss.com/docs/installation/framework-guides/nextjs) — v4 PostCSS setup.
+- [shadcn Next.js setup](https://ui.shadcn.com/docs/installation/next) and [CLI reference](https://ui.shadcn.com/docs/cli) — existing-project init; current default base-nova preset.
+- [Gemini quickstart](https://aistudio.google.com/docs/get-started) — redirected from Google's Gemini API quickstart; current `@google/genai` package and server API-key usage.
+- [pdf-parse maintainer documentation](https://github.com/mehmet-kozan/pdf-parse) — v2 API, Node support, cleanup, Next.js support notes.
+- [Mammoth maintainer documentation](https://github.com/mwilliamson/mammoth.js) — raw text extraction and untrusted-file warnings.
+- [docx project documentation](https://github.com/dolanmiu/docx) — JavaScript/TypeScript and Node/browser support. A previously indexed Packer API URL returned 404; do not rely on that stale URL when implementing export.
+- [Zod documentation](https://zod.dev/) — v4 and strict TypeScript.
+- [Vitest getting started](https://vitest.dev/guide/) — installation and Node/Vite requirements.
+- [Playwright introduction](https://playwright.dev/docs/intro) and [web server configuration](https://playwright.dev/docs/test-webserver) — browser setup and managed server lifecycle.
+
+Supabase documentation was not needed for installation because no Supabase package or infrastructure was added. Consult its current SSR/Auth/RLS documentation if persistence is approved later.

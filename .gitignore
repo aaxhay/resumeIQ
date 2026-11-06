@@ -1,0 +1,44 @@
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+artifacts/
+*.tsbuildinfo
+next-env.d.ts
+.env*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+.vercel/
+
+# Local/private tooling configuration
+.claude/settings.local.json
+.claude/worktrees/
+.vscode/
+.idea/
+*.local.*
+
+# Credentials and confidential material (never add with git add -f)
+secrets/
+private/
+credentials/
+.aws/
+.ssh/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa
+id_ed25519
+credentials*.json
+service-account*.json
+service_account*.json
+
+# Real resumes/documents are not fixtures; generate synthetic fixtures in tests
+*.pdf
+*.docx
+*.doc
