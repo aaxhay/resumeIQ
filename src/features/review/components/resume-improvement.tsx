@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
+import { ResumeDocxExport } from "./resume-docx-export";
 import { Textarea } from "@/components/ui/textarea";
 import { MAX_EDIT_TEXT, type ImprovementResult, type ImprovementSession, type ImprovementSuggestion } from "@/lib/resume-improvement/contracts";
 import { acceptSuggestion, applicability, chooseTarget, editSuggestion, rejectSuggestion, restoreOriginal, undoLatestEdit } from "@/lib/resume-improvement/editor";
@@ -94,10 +95,10 @@ export function ResumeImprovement({ initialSession }: { initialSession: Improvem
   }
 
   return <section ref={panel} tabIndex={-1} aria-labelledby="improvement-title" className="min-w-0 space-y-5 rounded-xl border bg-card p-4 sm:p-6" data-testid="resume-improvement">
-    <div><p className="eyebrow">Your decisions · local only</p><h2 id="improvement-title" className="mt-2 text-xl font-semibold">Improve your resume</h2><p className="mt-3 text-sm leading-7 text-muted-foreground">Compare each recommendation, edit it if needed, and accept only wording you can verify. Nothing is applied automatically. These controls make no additional AI calls.</p></div>
+    <div><p className="eyebrow">Your decisions · separate draft</p><h2 id="improvement-title" className="mt-2 text-xl font-semibold">Improve your resume</h2><p className="mt-3 text-sm leading-7 text-muted-foreground">Compare each recommendation, edit it if needed, and accept only wording you can verify. Nothing is applied automatically. These controls make no additional AI calls.</p></div>
     <Notice>
       <p>The confirmed original below is immutable. The improved draft is separate and stays available if you change the source, review mode, provider preview, or consent above. It still belongs to this original snapshot, not a new review.</p>
-      <p className="mt-2">This workspace is held only in this page’s memory. Copy any text you want to keep before refreshing, closing, or replacing the workspace. No file export or permanent storage is implemented.</p>
+      <p className="mt-2">This workspace is held only in this page’s memory. Download the improved DOCX or copy any text you want to keep before refreshing, closing, or replacing the workspace. No permanent application storage is implemented.</p>
       <p className="mt-2">AI wording is limited to conservative removal of leading filler or bullet markers. Other shortening is held back because substring checks alone cannot preserve meaning. If a recommendation needs new facts, supply the specific truthful details yourself or reject it; the application will not invent them.</p>
     </Notice>
     <div className="flex flex-wrap gap-3">
@@ -112,6 +113,7 @@ export function ResumeImprovement({ initialSession }: { initialSession: Improvem
     <div className="space-y-4">{session.suggestions.map(suggestion => <SuggestionCard key={suggestion.id} suggestion={suggestion} session={session} update={update} />)}</div>
     <details className="rounded-lg border p-4"><summary className="cursor-pointer font-medium">Accepted-edit history ({session.history.length})</summary>{session.history.length === 0 ? <p className="mt-3 text-sm">No accepted edits.</p> : <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm">{session.history.map(entry => <li key={entry.suggestionId}>{entry.suggestionId} · original characters {entry.start + 1}–{entry.end}{entry.previousSuggestion.status === "manually_edited" ? " · user-authored wording" : " · AI wording"}</li>)}</ol>}</details>
     <details className="rounded-lg border p-4"><summary className="cursor-pointer font-medium">Confirmed original · unchanged</summary><label htmlFor="improvement-original" className="mt-3 block text-sm font-medium">Original resume snapshot</label><Textarea id="improvement-original" readOnly value={session.originalText} className="mt-2 min-h-64" spellCheck={false} /></details>
+    <ResumeDocxExport key={session.revision} text={session.modifiedText} />
     <div><label htmlFor="improvement-preview" className="font-semibold">Improved resume preview</label><p className="my-2 text-xs leading-6 text-muted-foreground">Only accepted edits appear here. Read-only plain text; review the whole resume before using it. Pending, rejected, and unsaved edits are not included.</p><Textarea id="improvement-preview" readOnly value={session.modifiedText} className="min-h-96" spellCheck={false} /></div>
   </section>;
 }

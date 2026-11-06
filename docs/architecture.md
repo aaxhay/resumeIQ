@@ -2,7 +2,7 @@
 
 ## One application, explicit boundaries
 
-Next.js App Router + strict TypeScript, Tailwind, and shadcn/ui. The session-only MVP needs no database. The current milestone implements upload → mode selection → extraction → editable text confirmation → explicit deterministic text checks. Optional consent-based Gemini review adds a grouped results dashboard, explicit job-description fields, and requirement-level evidence comparison. A separate controlled improvement workspace reuses validated recommendations with explicit accept/reject/manual editing, original-coordinate patches, undo, and restore. Nothing is applied automatically. Full generative rewriting and export remain future work. See [controlled improvement](resume-improvement.md).
+Next.js App Router + strict TypeScript, Tailwind, and shadcn/ui. The session-only MVP needs no database. The current milestone implements upload → mode selection → extraction → editable text confirmation → explicit deterministic text checks. Optional consent-based Gemini review adds a grouped results dashboard, explicit job-description fields, and requirement-level evidence comparison. A separate controlled improvement workspace reuses validated recommendations with explicit accept/reject/manual editing, original-coordinate patches, undo, and restore. Nothing is applied automatically. An explicit server-generated DOCX download preserves the current improved preview using a clean editable template and verifies its text before returning it. Full generative rewriting remains future work. See [controlled improvement](resume-improvement.md) and [DOCX export](docx-export.md).
 
 ```text
 src/app/                         Server pages and thin Node route handlers
@@ -17,7 +17,9 @@ src/lib/ai-review/               Shared strict schemas and contact minimization
 src/lib/job-description/         Pure explicit-field extraction and provenance contracts
 src/lib/resume-improvement/      Immutable-source patches, strict contracts, bounded undo
 src/server/ai/                   Gemini adapter, provider interface, evidence validation, guards
-src/server/documents/            Reserved DOCX export
+src/lib/resume-export/           Bounded DOCX export contracts
+src/server/documents/            Editable DOCX generation and content verification
+src/server/http/                 Shared bounded same-origin JSON reader
 src/server/data/                 Reserved optional persistence
 ```
 
@@ -44,13 +46,13 @@ The analyzer imports only browser-safe contracts/helpers and Zod; it can also ru
 | `POST /api/resume/extract` | Implemented | One PDF/DOCX or `{text}` → text/warnings/stats or typed error |
 | `GET /api/reviews` | Implemented | Configuration-presence and operator privacy-policy booleans only |
 | `POST /api/reviews` | Implemented | Confirmed minimized previews, consent, general/job mode → validated feedback and nullable jobAnalysis or safe error |
-| `POST /api/resume/export` | Planned | User-approved structured resume → DOCX |
+| `POST /api/resume/export` | Implemented | Strict bounded `{text}` current improved preview → verified DOCX attachment or safe typed error |
 
 The analysis endpoint must repeat text, mode, and job-description validation and require consent. A browser confirmation flag is not proof of trusted content. Gemini must receive supplied documents as untrusted data, never instructions. Validate model output; do not fabricate achievements or ATS guarantees. Invalidate analysis when text/preferences change, and export when approved content changes.
 
 ## Session and privacy
 
-Resume bytes/text are processed in server memory. Edits/JD stay browser-local until the optional AI action sends reviewed minimized previews to the server and Google. Explicit consent and synthetic-only/paid-reviewed operator policy are checked server-side. No localStorage, account, database, document files, or stored provider output. Hashes/timestamps provide short-lived local duplicate controls; no raw documents are cached. Improvement drafts remain separate browser-memory snapshots when analysis inputs change. Replacing one requires confirmation; Start over confirms discarding the workspace before clearing the page. Reload also loses local work, with a best-effort browser warning while a workspace is open. Process exit is not secure erasure. No document/prompt/provider payload logging. Google has separate retention/security/abuse terms; do not promise zero provider retention. See `ai-integration.md`.
+Resume bytes/text are processed in server memory. Edits/JD stay browser-local until an explicit action: AI review sends minimized previews to the server and Google; DOCX export sends only the current improved resume (including supplied contacts) to this application's server for in-memory generation and verification, not Google. Explicit consent and synthetic-only/paid-reviewed operator policy are checked server-side. No localStorage, account, database, document files, or stored provider output. Hashes/timestamps provide short-lived local duplicate controls; no raw documents are cached. Improvement drafts remain separate browser-memory snapshots when analysis inputs change. Replacing one requires confirmation; Start over confirms discarding the workspace before clearing the page. Reload also loses local work, with a best-effort browser warning while a workspace is open. Process exit is not secure erasure. No document/prompt/provider payload logging. Google has separate retention/security/abuse terms; do not promise zero provider retention. See `ai-integration.md`.
 
 Supabase remains deferred until an actual history/account requirement justifies Auth, private Storage, RLS, retention, and ownership tests.
 

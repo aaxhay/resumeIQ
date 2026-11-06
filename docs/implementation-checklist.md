@@ -1,6 +1,6 @@
 # Implementation checklist
 
-The 1–2 day target prioritizes one trustworthy complete workflow over account/history features. Only check items after implementation and verification. The current authorization boundary includes **server extraction, confirmed previews, Gemini review, job-description analysis, the results dashboard, and controlled resume improvement**. Export remains future work.
+The 1–2 day target prioritizes one trustworthy complete workflow over account/history features. Only check items after implementation and verification. The current authorization boundary includes **server extraction, confirmed previews, Gemini review, job-description analysis, the results dashboard, controlled resume improvement, and downloadable DOCX export**.
 
 ## Phase 0 — Foundation (completed)
 
@@ -109,13 +109,15 @@ Dependencies: validated evidence-backed review. See [resume-improvement.md](resu
 - [x] Pass `npm run check`: 526 unit/integration tests, 80 desktop/mobile browser/API tests, lint, strict types, and production build. Maintain root `CHAT_LOG.md`.
 - [x] Record live-provider limitation honestly: fresh synthetic PDF review returned `PROVIDER_ERROR` before improvement; no retry or live-success claim.
 
-## Future — DOCX export
+## Current — DOCX export
 
-Dependencies: user-approved improved content. Export remains unimplemented.
-- [ ] Move `docx` from fixture-only dev dependency to runtime when export is authorized; generate simple ATS-friendly DOCX from approved content only.
-- [ ] Handle download failures and invalid/empty export data.
-- [ ] Test DOCX structure and round-trip text; no formatting-preservation claim.
-- [ ] E2E both modes through export, including recoverable failures.
+Dependencies: user-approved improved preview. See [DOCX export](docx-export.md).
+- [x] Promote pinned `docx` to runtime; generate a clean editable template from approved preview text only, with existing contacts/sections and no inferred facts.
+- [x] Validate bounded same-origin input and generated ZIP/OOXML structure; re-extract and compare all canonical text before returning a file.
+- [x] Verify invalid/empty data, Unicode, long content, generator/parser errors, accepted manual edits, and rejected/pending exclusions in focused tests.
+- [x] Verify an actual development-server export response, attachment headers, and text roundtrip using synthetic data without AI calls.
+- [x] Pass the full quality gate: 608 unit/integration tests, 90 desktop/mobile browser/API tests, lint, strict types, and production build. Verify both modes through real download/re-extraction, recoverable failures, stale cancellation, keyboard focus, and mobile layout; inspect desktop/mobile screenshots.
+- [x] Rerun dependency audits: zero runtime findings; thirteen existing tooling entries (two low, eleven moderate). No forced fixes.
 
 ## Phase 4 — Release hardening (day 2, remaining)
 

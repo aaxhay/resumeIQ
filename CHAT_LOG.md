@@ -21,9 +21,11 @@ This is a concise chronological log of **human requests**, not a verbatim transc
 14. **Job-specific Gemini error report (verbatim; 2026-11-06).** “when im giving job description and trying to get the gemini review its not sending me correct response and sending something like --> The response could not be validated. Gemini introduced an unverified number or an unsupported job-match claim. The response was rejected rather than displaying that claim. (Reason: unsupported_claim)
 No AI feedback is shown. Check the previews, then use Retry Gemini review to make a new request. Local checks remain available.”
 
+15. **Downloadable DOCX (summary; requested 2026-11-06).** “Implement downloadable DOCX generation.” Use the current supported `docx` APIs server-side to export the current improved resume as a professional, editable Word document. Preserve existing contact details, summary, experience, education, skills, projects, certifications, and other supplied sections without inventing content. Use consistent readable headings, spacing, fonts, dates, bullets, and margins; avoid complex decorative layouts. Include accepted and manually edited changes, exclude rejected suggestions, preserve the original, provide a sensible filename and correct MIME type. Re-open/re-extract output to verify critical content, accepted/rejected decisions, and absence of introduced facts; test special characters and long content. Handle missing/empty content, generation errors, invalid structures, and download failures. Do not claim exact original-layout preservation without implementing and verifying it. Completion means a valid downloadable editable DOCX containing the correct approved changes.
+
 ## Standing implementation requirements
 
 - Strict TypeScript; no `any`; validate external inputs and use typed contracts.
 - No exposed credentials, full-document logging, unnecessary persistence, invented evidence, or placeholder functionality that looks real.
 - Test before claiming completion. Distinguish deterministic/mocked tests from live-provider verification and report failures or skipped steps accurately.
-- Preserve the security and Git safeguards in `CLAUDE.md`. Future export, persistence, or deployment requires its own authorized implementation phase.
+- Preserve the security and Git safeguards in `CLAUDE.md`. Further persistence, deployment, or export features beyond the requested DOCX workflow require their own authorized implementation phase.
