@@ -1,4 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import { extractRawText } from "mammoth";
+import { DOCX_CONTENT_TYPE, EXPORT_FILENAME } from "../../src/lib/resume-export/contracts";
 import { reviewRequestSchema, type AiReview, type ReviewRequest } from "../../src/lib/ai-review/contracts";
 import { prepareAiText } from "../../src/lib/ai-review/privacy";
 import { aiQuote, aiResume, validAiReview } from "../fixtures/ai-review";
@@ -11,6 +14,18 @@ const safeRevised = "Built accessible tools with automated tests for fictional t
 const manualOriginal = "Documented development practices and supported peer reviews.";
 const manualRevised = "Supported peer reviews and documented development practices.";
 const rejectedOriginal = "Created a guide that enabled independent onboarding.";
+const rejectedRevision = "Enabled independent onboarding by creating a guide.";
+const canonical = (text: string) => text.split(/\r?\n/u).map(line => line.trim().replace(/^[-*•]\s+/u, "")).filter(Boolean).join("\n");
+async function downloadText(page: Page) {
+  const downloadEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download DOCX", exact: true }).click();
+  const download = await downloadEvent;
+  expect(download.suggestedFilename()).toBe(EXPORT_FILENAME);
+  expect(await download.failure()).toBeNull();
+  const path = await download.path();
+  if (!path) throw new Error("Expected local synthetic download");
+  return (await extractRawText({ buffer: await readFile(path) })).value;
+}
 // Extend the shared synthetic resume, keeping its citations and every factual qualifier.
 const extendedResume = aiResume.replace("EXPERIENCE\n", `EXPERIENCE\n${safeOriginal}\n${manualOriginal}\n`);
 const workspace = (page: Page) => page.getByTestId("resume-improvement");
@@ -160,10 +175,20 @@ for (const mode of ["general", "job-specific"] as const) {
     await accept(card(page, "manual")).press("Space");
     const combined = aiDraft.replace(manualOriginal, manualRevised);
     await expect(preview(page)).toHaveValue(combined); // Two nonoverlapping edits in EXPERIENCE.
+    await saveManual(page, "reject", rejectedRevision);
     await card(page, "reject").getByRole("button", { name: "Reject suggestion" }).press("Enter");
     await expect(card(page, "reject").getByTestId("suggestion-status")).toHaveText("Rejected");
     await expect(card(page, "reject").getByRole("button", { name: "Edit wording" })).toBeDisabled();
     await expect(preview(page)).toHaveValue(combined);
+    const downloaded = await downloadText(page); // Real server generation and extraction, not an export mock.
+    expect(canonical(downloaded)).toBe(canonical(combined));
+    expect(downloaded).toContain(safeRevised);
+    expect(downloaded).toContain(manualRevised);
+    expect(downloaded).toContain(rejectedOriginal);
+    expect(downloaded).not.toContain(rejectedRevision);
+    expect(downloaded).not.toContain(safeOriginal);
+    await expect(editor(page)).toHaveValue(original);
+    expect(requests).toHaveLength(1); // Export makes no extra AI call.
     const history = summary(workspace(page), "Accepted-edit history (2)");
     await history.press("Enter");
     await expect(history.locator("..")).toContainText("user-authored wording");
@@ -285,6 +310,78 @@ test("overlapping edits block until undo and unsafe AI shortening stays unapplie
   await expect(editor(page)).toHaveValue(original);
   expect(requests).toHaveLength(1);
   expect(errors).toEqual([]);
+});
+
+test("export preserves contact details, special characters and empty/unknown sections without applying unaccepted drafts", async ({ page }) => {
+  const special = "\nCONTACT\nfictional@example.test | +1 202 555 0199\nCUSTOM CONTRIBUTIONS\nC++ & C# <tools> — café résumé 中文 😀\nCERTIFICATIONS\n\nOTHER DETAILS\nAvailable for fictional examples.";
+  const { original, requests } = await start(page, { text: extendedResume + special });
+  await saveManual(page, "manual", manualRevised); // Saved, but intentionally not accepted.
+  await card(page, "reject").getByRole("button", { name: "Edit wording" }).click();
+  await card(page, "reject").getByRole("textbox", { name: "Edit suggested text" }).fill("UNSAVED_DRAFT_NOT_FOR_EXPORT");
+  const extracted = await downloadText(page);
+  expect(canonical(extracted)).toBe(canonical(original));
+  expect(extracted).toContain("fictional@example.test");
+  expect(extracted).toContain("C++ & C# <tools> — café résumé 中文 😀");
+  expect(extracted).toContain("CERTIFICATIONS");
+  expect(extracted).not.toContain(manualRevised);
+  expect(extracted).not.toContain("UNSAVED_DRAFT_NOT_FOR_EXPORT");
+  await assertOriginal(page, original);
+  expect(requests).toHaveLength(1);
+});
+
+test("export handles server, network and invalid-file failures without losing the draft, then retries explicitly", async ({ page }) => {
+  const { original } = await start(page);
+  await accept(card(page, "safe")).click();
+  const expected = original.replace(safeOriginal, safeRevised);
+  let attempts = 0;
+  await page.route("**/api/resume/export", async route => {
+    attempts++;
+    expect(route.request().postDataJSON()).toEqual({ text: expected });
+    if (attempts === 1) await route.fulfill({ status: 500, json: { ok: false, error: { code: "INVALID_DOCUMENT", message: "PRIVATE_EXPORT_DETAIL" } } });
+    else if (attempts === 2) await route.abort("failed");
+    else if (attempts === 3) await route.fulfill({ contentType: "text/html", body: "<p>Not a document</p>" });
+    else await route.fulfill({ contentType: DOCX_CONTENT_TYPE, body: "invalid archive" });
+  });
+  const area = page.getByRole("region", { name: "Download your improved resume", exact: true });
+  const button = area.getByRole("button", { name: "Download DOCX", exact: true });
+  for (let i = 0; i < 4; i++) {
+    await button.click();
+    await expect(area.getByRole("alert")).toBeFocused();
+    await expect(area.getByRole("alert")).toContainText(i === 0 ? "failed its structure or content checks" : "could not be completed");
+    await expect(page.getByText("PRIVATE_EXPORT_DETAIL")).toHaveCount(0);
+    await expect(preview(page)).toHaveValue(expected);
+    await expect(button).toBeEnabled();
+    expect(attempts).toBe(i + 1);
+  }
+  await page.unroute("**/api/resume/export");
+  expect(canonical(await downloadText(page))).toBe(canonical(expected));
+  await expect(area.getByRole("status")).toContainText("Download requested");
+  await assertOriginal(page, original);
+});
+
+test("workspace changes cancel stale export and prevent duplicate download requests", async ({ page }) => {
+  const { original } = await start(page);
+  const downloads: string[] = [];
+  page.on("download", download => downloads.push(download.suggestedFilename()));
+  let requests = 0;
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/api/resume/export", async route => {
+    requests++;
+    await held;
+    await route.fulfill({ contentType: DOCX_CONTENT_TYPE, body: Buffer.from([0x50, 0x4b, 0x03, 0x04]) }).catch(() => undefined);
+  });
+  await page.getByRole("button", { name: "Download DOCX", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Generating DOCX…", exact: true })).toBeDisabled();
+  await expect.poll(() => requests).toBe(1);
+  await accept(card(page, "safe")).click();
+  await expect(page.getByRole("button", { name: "Download DOCX", exact: true })).toBeEnabled();
+  release();
+  await page.unrouteAll({ behavior: "wait" });
+  expect(downloads).toEqual([]);
+  const extracted = await downloadText(page);
+  expect(canonical(extracted)).toBe(canonical(original.replace(safeOriginal, safeRevised)));
+  expect(downloads).toEqual([EXPORT_FILENAME]);
 });
 
 test("local drafts survive preview, consent, mode and source changes until replacement is confirmed", async ({ page }) => {

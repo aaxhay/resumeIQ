@@ -1,6 +1,6 @@
 # ResumeIQ
 
-A resume-review application with **PDF/DOCX extraction, editable confirmation, local deterministic checks, and optional Gemini AI feedback**. General and job-specific results include a grouped, collapsible dashboard; job review adds explicit job fields and requirement-level evidence statuses. Controlled improvement adds a separate draft with accept/reject, manual wording edits, undo, and restore. No ATS scores, hiring guarantees, automatic resume changes, or export.
+A resume-review application with **PDF/DOCX extraction, editable confirmation, local deterministic checks, and optional Gemini AI feedback**. General and job-specific results include a grouped, collapsible dashboard; job review adds explicit job fields and requirement-level evidence statuses. Controlled improvement adds a separate draft with accept/reject, manual wording edits, undo, and restore. The current improved preview can be downloaded as a clean, editable DOCX. No ATS scores, hiring guarantees, or automatic resume changes.
 
 ## Local setup
 
@@ -13,17 +13,23 @@ npm run dev
 
 Open **http://localhost:3000/review**. Upload a PDF/DOCX up to 5 MiB or paste text; select a mode; extract/prepare; inspect and edit; confirm. **Run text checks** executes local rules without provider calls. For optional AI feedback, review the minimized provider previews, remove unnecessary personal information, give explicit consent, and choose **Send previews to Gemini**.
 
-After Gemini results, choose **Improve this resume**. Compare suggestions, choose a location for repeated text, save manual wording, then accept or reject each change. Undo the latest accepted edit or restore the original. The draft is separate from the confirmed source and survives changes to review inputs; replacing it or starting over requires confirmation. It is memory-only: copy anything you want to retain before leaving. These controls make no additional AI calls. See [controlled improvement](docs/resume-improvement.md).
+After Gemini results, choose **Improve this resume**. Compare suggestions, choose a location for repeated text, save manual wording, then accept or reject each change. Undo the latest accepted edit or restore the original. The draft is separate from the confirmed source and survives changes to review inputs; replacing it or starting over requires confirmation. It is memory-only: download the improved DOCX or copy anything you want to retain before leaving. **Download DOCX** sends only the current improved preview to this application's server for in-memory generation and text verification, not to Google. Accept saved manual edits first; unaccepted and rejected suggestions are not exported. The clean template does not reproduce the original layout. See [controlled improvement](docs/resume-improvement.md) and [DOCX export](docs/docx-export.md).
 
 Job-specific mode requires a 50–10,000-character job description. It stays local during extraction/local checks and is sent to Gemini only through the explicit AI action. AI resumes are limited to 30,000 characters; extraction/editing separately allows 80,000. No silent input truncation.
 
 ### Gemini configuration and personal-data gate
 
-Copy `.env.example` to ignored `.env.local` without overwriting an existing configuration. Set server-only `GEMINI_API_KEY` and explicitly selected `GEMINI_MODEL`. Never put credentials in `NEXT_PUBLIC_*`, tracked templates, or chat. Official SDK: `@google/genai@3.0.0`. Missing credentials disable AI rather than produce fake results.
+Copy `.env.example` to ignored `.env.local` without overwriting an existing configuration. Set server-only `GEMINI_API_KEY` and explicitly selected `GEMINI_MODEL`. Never put secret credentials in `NEXT_PUBLIC_*`, tracked templates, or chat. Supabase's explicitly publishable key is public by design and is not a secret/service-role key. Official SDK: `@google/genai@3.0.0`. Missing credentials disable AI rather than produce fake results.
 
 **Default AI use is synthetic-only.** Google unpaid-service terms prohibit personal/confidential inputs. Do not mark a real resume as synthetic even after redaction. `GEMINI_DATA_POLICY=paid-reviewed` is reserved for an operator who has verified paid-service terms/billing, supported regions, adult-use/access restrictions, privacy disclosures, and deployment safeguards. It is not automatic billing verification and has not been enabled here. See [AI integration and data-handling limits](docs/ai-integration.md).
 
-Best-effort contact removal is not anonymity; names, addresses, and identifying context can remain. Provider previews are editable. The application does not persist or log raw resumes, prompts, or AI responses. Google has separate processing/retention terms. Cancellation or timeout does not guarantee avoidance of provider charges.
+Best-effort contact removal is not anonymity; names, addresses, and identifying context can remain. Provider previews are editable. The application does not persist or log raw resumes, prompts, or complete AI responses. Optional account history stores only the separately previewed and consented summary/excerpts described below. Google has separate processing/retention terms. Cancellation or timeout does not guarantee avoidance of provider charges.
+
+### Optional Supabase accounts and summaries
+
+No account is needed for a first review. **Save review summary** offers inline sign-in/signup, an exact preview, and separate storage consent; `/account` provides read-only history and confirmed deletion. Only a minimized summary and limited rewrite excerpts are saved—not files, full resumes, job descriptions, improved drafts, or edit history. The workspace remains memory-only.
+
+Your configured publishable key reached Supabase Auth successfully, but the required tables were absent. History stays **disabled by default**. Apply the reviewed migration and configure/verify retention in the intended project's SQL Editor, then set `SUPABASE_HISTORY_ENABLED=true`; configure Auth callback URLs as documented. No privileged application key is required. See [setup, security, retention, and verification limits](docs/supabase.md). No hosted users, emails, migration, or storage bucket were created during implementation.
 
 ## Commands
 
@@ -59,8 +65,13 @@ src/lib/config/             Pure configuration validation
 src/server/resume-processing/ Bounded isolated PDF/DOCX extraction
 src/server/ai/               Provider interface, Gemini adapter, validation, cost guards
 src/server/config/           Server-only environment access
-src/server/documents/        Reserved DOCX export
-src/server/data/             Reserved optional persistence
+src/lib/resume-export/       Bounded export contracts and line handling
+src/server/documents/        DOCX generation and round-trip verification
+src/server/http/             Shared bounded same-origin JSON reader
+src/features/saved-reviews/  Optional account, consented summary saving, read-only history
+src/lib/saved-reviews/       Strict minimized persistence contracts and projection
+src/server/supabase/         Request-scoped Auth, verified history access, local bounds
+supabase/                   Reviewed migration/RLS and operator retention reference
 scripts/verify-gemini.ts     Explicit synthetic live-provider verification
 ```
 
@@ -69,14 +80,16 @@ The rest of the application uses `ResumeAiProvider`, not Gemini SDK types. Model
 ## Current limits and release blockers
 
 - English-oriented text analysis, not original-layout assessment, fact checking, or exhaustive job coverage.
-- No accounts/saved review history, database, OCR, legacy DOC, billing UI, public deployment, full generative rewriting, or DOCX export. The editing workspace has only a memory-local accepted-edit history.
+- Optional Supabase Auth/saved-summary code is implemented; hosted migration, cleanup scheduling, and live authenticated verification remain operator steps. No persistent resume files, OCR, legacy DOC, billing UI, public deployment, or full generative rewriting. The editing workspace has only memory-local accepted-edit history.
 - AI requests have deadlines, duplicate suppression, local concurrency and request caps. These are **not distributed abuse protection or monetary budgets**; do not expose the endpoint publicly until authenticated/trusted ingress, distributed controls, provider budget limits, and deployment behavior are verified.
 - Local full-project Node execution is supported. Keep worker sources and runtime dependencies; `.next`-only, standalone, Edge, and serverless packaging are not verified. Builds use system fonts without external font fetching.
 - Existing tooling advisories and compatibility exceptions are documented; no forced dependency fixes.
 
 ## Documentation and verification
 
-Latest quality gate: **542 unit/integration tests**, **84 desktop/mobile browser/API tests**, lint, strict types, and production build passed.
+Latest DOCX-export quality gate: **608 unit/integration tests**, **90 desktop/mobile browser/API tests**, lint, strict types, and production build passed. Both review modes download real generated DOCX files and re-extract their text to verify accepted edits, rejected exclusions, and original preservation; the AI review is mocked in these deterministic browser tests. A separate actual development-server export roundtrip also passed. Post-promotion audit: zero runtime findings, thirteen existing tooling entries. See [DOCX export verification](docs/docx-export.md#verification).
+
+Earlier job-claim recovery quality gate: **542 unit/integration tests**, **84 desktop/mobile browser/API tests**, lint, strict types, and production build passed.
 
 Job-specific claim recovery: a live synthetic composite job description reproduced the reported unsupported-claim failure; after targeted correction diagnostics and clearer evidence instructions, the same case returned validated feedback. Strict checks remain enabled, with no silent claim downgrades or extra retries. The UI now distinguishes unsupported job matches from unverified numbers. See [job-specific claim recovery](docs/ai-integration.md#job-specific-claim-recovery-2026-11-06).
 
@@ -86,6 +99,8 @@ Earlier validation-recovery quality gate: **482 unit/integration tests**, **68 d
 
 Dashboard milestone quality gate: **460 unit/integration tests**, **66 desktop/mobile browser/API tests**, lint, strict TypeScript, and production build passed. Both modes were tested from real PDF/DOCX upload through dashboard with semantically validated mocked feedback. A live synthetic DOCX → Gemini → job-specific dashboard run also passed; fresh general-mode live attempts returned `INVALID_RESPONSE` and `PROVIDER_ERROR`, with no feedback displayed. Those failed attempts remain recorded as failures. A subsequent recovery fix added missing correction eligibility and safe validation reasons; a fresh real PDF → Gemini → general dashboard run then passed. See [validation-error recovery](docs/ai-integration.md#validation-error-recovery-and-safe-diagnostics). Desktop/mobile screenshots were inspected. The last dependency audit remains zero runtime findings and thirteen documented tooling entries; no dependencies changed. These checks do not establish real-user privacy compliance or hallucination-free analysis.
 
+- [Optional Supabase setup, Auth/RLS, retention, deletion, and verification limits](docs/supabase.md)
+- [DOCX download, content verification, formatting, privacy, and limits](docs/docx-export.md)
 - [Controlled improvement, patch safety, draft lifetime, and limits](docs/resume-improvement.md)
 - [Concise chronological human prompt log](CHAT_LOG.md)
 - [Results dashboard, job extraction, matching methodology, and limits](docs/results-dashboard.md)

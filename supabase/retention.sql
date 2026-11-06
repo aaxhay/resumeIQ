@@ -1,0 +1,24 @@
+-- OPERATOR REFERENCE ONLY. Nothing here is applied or scheduled by the app/tests.
+-- Apply the reviewed migration manually using a trusted privileged operator workflow.
+-- Never use a browser publishable key to run cleanup; never ship service-role credentials.
+-- RLS hides reviews at exactly 30 days and their children immediately, even when cleanup
+-- is delayed. Physical erasure requires a monitored privileged job. Auth/profile deletion
+-- cascades all snapshots; backup retention remains the operator/provider's responsibility.
+-- No uploaded files, storage buckets, raw resume, or job-description columns are created.
+
+-- Run periodically as postgres or service_role (returns number of deleted reviews):
+-- select public.delete_expired_resume_reviews();
+
+-- OPTIONAL pg_cron setup, only after a privileged operator verifies availability and
+-- explicitly chooses to enable it. Do not apply automatically, provision resources,
+-- or assume pg_cron exists. Schedule as postgres, not authenticated/anon.
+-- create extension if not exists pg_cron;
+-- select cron.schedule(
+--   'resumeiq-delete-expired-reviews',
+--   '17 * * * *',
+--   $$select public.delete_expired_resume_reviews();$$
+-- );
+-- Monitor cron.job_run_details and alert on failures without logging snapshot contents.
+-- To remove an existing schedule:
+-- select cron.unschedule('resumeiq-delete-expired-reviews');
+-- Without pg_cron, arrange an equivalent monitored privileged external schedule.
