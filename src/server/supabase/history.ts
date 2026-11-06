@@ -1,6 +1,6 @@
 import "server-only";
 import { configuration, authenticatedClient } from "./client";
-import { AccountError } from "./errors";
+import { AccountError, historyStorageError } from "./errors";
 import { historyListSchema, saveReviewRequestSchema, savedResponseSchema, type SaveReviewRequest } from "../../lib/saved-reviews/contracts";
 
 export function requireHistoryEnabled() {
@@ -13,7 +13,7 @@ export async function listSavedReviews() {
   requireHistoryEnabled();
   const { client, user } = await authenticatedClient();
   const { data, error } = await client.from("resume_reviews").select(selectedFields).eq("user_id", user.id).gt("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).order("created_at", { ascending: false }).limit(20);
-  if (error) throw new AccountError("STORAGE_ERROR", 503);
+  if (error) throw historyStorageError(error);
   const parsed = historyListSchema.safeParse({ ok: true, reviews: data });
   if (!parsed.success) throw new AccountError("STORAGE_ERROR", 503);
   return parsed.data;
@@ -32,7 +32,7 @@ export async function saveReview(input: SaveReviewRequest) {
     p_id: value.id, p_review_mode: value.review_mode, p_resume_filename: value.resume_filename,
     p_analysis_result: value.analysis_result, p_suggestions: value.suggestions,
   });
-  if (error) throw new AccountError("STORAGE_ERROR", 503);
+  if (error) throw historyStorageError(error);
   const parsed = savedResponseSchema.safeParse({ ok: true, id: data });
   if (!parsed.success || parsed.data.id !== value.id) throw new AccountError("STORAGE_ERROR", 503);
   return parsed.data;
@@ -41,7 +41,7 @@ export async function deleteSavedReview(id: string) {
   requireHistoryEnabled();
   const { client, user } = await authenticatedClient();
   const { data, error } = await client.from("resume_reviews").delete().eq("user_id", user.id).eq("id", id).select("id").maybeSingle();
-  if (error) throw new AccountError("STORAGE_ERROR", 503);
+  if (error) throw historyStorageError(error);
   if (!data || data.id !== id) throw new AccountError("NOT_FOUND", 404);
   return { ok: true as const };
 }

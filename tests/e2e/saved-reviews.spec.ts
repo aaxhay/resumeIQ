@@ -19,7 +19,7 @@ function savedReview(): SavedReview {
 }
 function failure(code: string) { return { ok: false, error: { code, message: "RAW_PRIVATE_INTERNAL_MESSAGE_DO_NOT_RENDER" } }; }
 
-type AccountOptions = { configured?: boolean; enabled?: boolean; signedIn?: boolean; confirmation?: boolean; failAuth?: boolean };
+type AccountOptions = { configured?: boolean; enabled?: boolean; setupRequired?: boolean; signedIn?: boolean; confirmation?: boolean; failAuth?: boolean };
 async function mockAccount(page: Page, options: AccountOptions = {}) {
   const calls: { method: string; body: unknown }[] = [];
   const state = { signedIn: options.signedIn ?? false };
@@ -27,7 +27,8 @@ async function mockAccount(page: Page, options: AccountOptions = {}) {
     const method = route.request().method();
     calls.push({ method, body: method === "GET" ? null : route.request().postDataJSON() });
     if (method === "GET") {
-      await route.fulfill({ json: { ok: true, configured: options.configured ?? true, historyEnabled: options.enabled ?? true, user: state.signedIn ? { email } : null } });
+      const setupRequired = state.signedIn && options.setupRequired;
+      await route.fulfill({ json: { ok: true, configured: options.configured ?? true, historyEnabled: setupRequired ? false : options.enabled ?? true, ...(setupRequired ? { historySetupRequired: true } : {}), user: state.signedIn ? { email } : null } });
       return;
     }
     const body = accountActionSchema.parse(route.request().postDataJSON());
@@ -109,6 +110,27 @@ for (const scenario of ["unconfigured", "disabled"] as const) {
     expect(histories).toBe(0);
   });
 }
+
+test("missing history setup preserves signed-in identity and sign-out without fetching history", async ({ page }) => {
+  const account = await mockAccount(page, { signedIn: true, setupRequired: true });
+  let histories = 0;
+  await page.route("**/api/review-history", async route => { histories++; await route.fulfill({ status: 503, json: failure("HISTORY_NOT_READY") }); });
+  await page.goto("/account");
+  await expect(page.getByText(`Signed in as ${email}`)).toBeVisible();
+  const notice = page.getByText(/Saved history requires database setup/);
+  await expect(notice).toContainText("configure retention using docs/supabase.md");
+  await expect(notice).toContainText("Turning on the history flag alone does not create the tables");
+  await expect(page.getByText(/Saving is unavailable on this deployment/)).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Saved review summaries" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Refresh history" })).toHaveCount(0);
+  expect(histories).toBe(0);
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page.getByText(/Signed out. Private history has been cleared/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
+  await expect(page.getByText(`Signed in as ${email}`)).toHaveCount(0);
+  expect(account.calls.filter(call => call.method === "POST").map(call => accountActionSchema.parse(call.body).action)).toEqual(["sign-out"]);
+  expect(histories).toBe(0);
+});
 
 test("signup validates a 12-character password, requires confirmation, then allows sign-in", async ({ page }) => {
   const account = await mockAccount(page, { confirmation: true });
@@ -329,6 +351,64 @@ test("optional inline save preserves the review and draft, previews exact data a
   await panel.getByRole("heading", { name: "Keep a summary, not your resume" }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath("optional-save-mobile.png") });
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
+});
+
+test("missing setup hides inline save controls without losing the current review or draft", async ({ page }) => {
+  await mockAccount(page, { signedIn: true, setupRequired: true });
+  await mockAi(page);
+  let saves = 0;
+  await page.route("**/api/review-history", async route => { saves++; await route.fulfill({ status: 503, json: failure("HISTORY_NOT_READY") }); });
+  await completeAi(page);
+  await page.getByRole("button", { name: "Improve this resume", exact: true }).click();
+  const draft = page.getByRole("textbox", { name: "Improved resume preview", exact: true });
+  const originalDraft = await draft.inputValue();
+  await openSave(page);
+  const panel = savePanel(page);
+  await expect(panel.getByText(/Saved history requires database setup/)).toBeVisible();
+  await expect(panel.getByText(`Signed in as ${email}`)).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Sign out", exact: true })).toBeEnabled();
+  await expect(panel.getByRole("button", { name: "Save summary", exact: true })).toHaveCount(0);
+  await expect(panel.getByRole("checkbox", { name: /I consent to saving this exact summary/ })).toHaveCount(0);
+  await expect(panel.getByText(/Summary saved to your account/)).toHaveCount(0);
+  await expect(page.getByTestId("ai-review-results")).toBeVisible();
+  await expect(draft).toHaveValue(originalDraft);
+  expect(saves).toBe(0);
+});
+
+test("missing save RPC shows safe setup guidance without false success or lost local edits", async ({ page }) => {
+  await mockAccount(page, { signedIn: true });
+  const aiPosts = await mockAi(page);
+  const saves: SaveReviewRequest[] = [];
+  await page.route("**/api/review-history", async route => {
+    expect(route.request().method()).toBe("POST");
+    saves.push(saveReviewRequestSchema.parse(route.request().postDataJSON()));
+    await route.fulfill({ status: 503, json: failure("HISTORY_NOT_READY") });
+  });
+  await completeAi(page);
+  await page.getByRole("button", { name: "Improve this resume", exact: true }).click();
+  const draft = page.getByRole("textbox", { name: "Improved resume preview", exact: true });
+  const originalDraft = await draft.inputValue();
+  await openSave(page);
+  const panel = savePanel(page);
+  await panel.getByRole("checkbox", { name: /I consent to saving this exact summary/ }).check();
+  await panel.getByRole("button", { name: "Save summary", exact: true }).click();
+  await expect(panel.getByRole("alert")).toContainText("Saved history requires database setup");
+  await expect(panel.getByRole("alert")).toContainText("configure retention using docs/supabase.md");
+  await expect(panel.getByRole("alert")).toContainText("retrying cannot fix missing tables");
+  await expect(panel).not.toContainText("RAW_PRIVATE");
+  await expect(panel.getByText(/Summary saved to your account/)).toHaveCount(0);
+  await expect(panel.getByText(`Signed in as ${email}`)).toBeVisible();
+  await expect(panel.getByRole("checkbox", { name: /I consent to saving this exact summary/ })).toBeChecked();
+  await expect(page.getByTestId("ai-review-results")).toBeVisible();
+  await expect(draft).toHaveValue(originalDraft);
+  expect(saves).toHaveLength(1);
+  await panel.getByRole("button", { name: "Retry saving summary" }).click();
+  await expect(panel.getByRole("alert")).toContainText("Saved history requires database setup");
+  await expect(panel.getByText(/Summary saved to your account/)).toHaveCount(0);
+  expect(saves).toHaveLength(2);
+  expect(saves[1]).toEqual(saves[0]);
+  expect(aiPosts).toHaveLength(1);
+  await expect(draft).toHaveValue(originalDraft);
 });
 
 test("a save rejected by an expired session clears save authorization without losing the current review", async ({ page }) => {

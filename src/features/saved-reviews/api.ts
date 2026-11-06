@@ -4,6 +4,7 @@ import { historyErrorSchema, type HistoryErrorCode } from "@/lib/saved-reviews/c
 const messages: Record<HistoryErrorCode, string> = {
   NOT_CONFIGURED: "Accounts and saving are unavailable on this deployment. You can still review anonymously.",
   HISTORY_DISABLED: "Saving is unavailable on this deployment. Your current review and local draft are unchanged.",
+  HISTORY_NOT_READY: "Saved history requires database setup. The operator must apply the Supabase migration and configure retention using docs/supabase.md. Your review and draft are unchanged; retrying cannot fix missing tables.",
   UNAUTHORIZED: "Your session has expired. Private history has been cleared from this page. Sign in again to continue.",
   INVALID_REQUEST: "Check the form and consent before trying again. Nothing new was confirmed saved.",
   AUTH_FAILED: "We could not complete account access. Check your email and password, confirm your email if needed, then try again.",

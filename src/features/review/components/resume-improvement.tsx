@@ -70,7 +70,7 @@ function SuggestionCard({ suggestion, session, update }: { suggestion: Improveme
 }
 
 /** Memory-only workspace. It outlives upstream review invalidation; never writes back to the source. */
-export function ResumeImprovement({ initialSession }: { initialSession: ImprovementSession }) {
+export function ResumeImprovement({ initialSession, onDownloadRequested }: { initialSession: ImprovementSession; onDownloadRequested: () => void }) {
   const [session, setSession] = useState(initialSession);
   const latest = useRef(session);
   const [message, setMessage] = useState("");
@@ -113,7 +113,7 @@ export function ResumeImprovement({ initialSession }: { initialSession: Improvem
     <div className="space-y-4">{session.suggestions.map(suggestion => <SuggestionCard key={suggestion.id} suggestion={suggestion} session={session} update={update} />)}</div>
     <details className="rounded-lg border p-4"><summary className="cursor-pointer font-medium">Accepted-edit history ({session.history.length})</summary>{session.history.length === 0 ? <p className="mt-3 text-sm">No accepted edits.</p> : <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm">{session.history.map(entry => <li key={entry.suggestionId}>{entry.suggestionId} · original characters {entry.start + 1}–{entry.end}{entry.previousSuggestion.status === "manually_edited" ? " · user-authored wording" : " · AI wording"}</li>)}</ol>}</details>
     <details className="rounded-lg border p-4"><summary className="cursor-pointer font-medium">Confirmed original · unchanged</summary><label htmlFor="improvement-original" className="mt-3 block text-sm font-medium">Original resume snapshot</label><Textarea id="improvement-original" readOnly value={session.originalText} className="mt-2 min-h-64" spellCheck={false} /></details>
-    <ResumeDocxExport key={session.revision} text={session.modifiedText} />
+    <ResumeDocxExport key={session.revision} text={session.modifiedText} onDownloadRequested={onDownloadRequested} />
     <div><label htmlFor="improvement-preview" className="font-semibold">Improved resume preview</label><p className="my-2 text-xs leading-6 text-muted-foreground">Only accepted edits appear here. Read-only plain text; review the whole resume before using it. Pending, rejected, and unsaved edits are not included.</p><Textarea id="improvement-preview" readOnly value={session.modifiedText} className="min-h-96" spellCheck={false} /></div>
   </section>;
 }
