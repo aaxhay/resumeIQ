@@ -22,6 +22,21 @@ async function dropFiles(page: Page, names: string[]) {
 
 test.beforeEach(async ({ page }) => { await page.goto("/review"); });
 
+test("setup inputs remain disabled until their client handlers are ready", async ({ page }) => {
+  let releaseScripts!: () => void;
+  const scriptsReady = new Promise<void>(resolve => { releaseScripts = resolve; });
+  await page.route(/\/_next\/static\/.*\.js(?:\?.*)?$/u, async route => { await scriptsReady; await route.continue(); });
+  await page.goto("/review", { waitUntil: "commit" });
+  try {
+    await expect(page.getByLabel("Choose resume file")).toBeDisabled();
+    await expect(page.getByRole("radio", { name: "Paste resume text", exact: true })).toBeDisabled();
+  } finally { releaseScripts(); }
+  await expect(page.getByLabel("Choose resume file")).toBeEnabled();
+  await page.getByLabel("Choose resume file").setInputFiles({ name: "hydration.pdf", mimeType: pdfType, buffer: await syntheticPdf() });
+  await expect(page.getByText(/Selected locally/)).toBeVisible();
+  await expect(upload(page)).toBeEnabled();
+});
+
 for (const kind of ["pdf", "docx"] as const) {
   test(`${kind}: upload, inspect, edit, confirm exact text, and start over`, async ({ page }, testInfo) => {
     const errors: string[] = [];

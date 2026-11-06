@@ -1,6 +1,7 @@
-import type { AiReview } from "../../lib/ai-review/contracts.ts";
+import type { AiReview } from "./contracts.ts";
 
-/** Narrow lexical guards, NOT semantic entailment or a complete skill inventory. */
+/** Pure source-text checks: no provider, configuration, credentials, I/O, or server dependencies.
+ * Narrow lexical guards, NOT semantic entailment or a complete skill inventory. */
 const wordCharacter = /[\p{L}\p{N}_+#]/u;
 function boundary(text: string, start: number, end: number): boolean {
   const before = text[start - 1] ?? "";
@@ -24,6 +25,28 @@ export function containsRequirementPhrase(source: string, phrase: string): boole
   return false;
 }
 
+/** Resolve an exact quote against original-source boundaries and enclosing sentences.
+ * A model-selected substring must not discard negation/instructions or split a token.
+ * Multiple identical occurrences are retained; one affirmative occurrence can support it.
+ */
+export function evidenceContexts(source: string, quote: string): string[] {
+  if (!quote.trim()) return [];
+  const breaks = [0, ...[...source.matchAll(/(?<=[.!?;])\s+|\n+/gu)].map(match => match.index + match[0].length), source.length];
+  const contexts = new Set<string>();
+  for (let start = source.indexOf(quote); start !== -1; start = source.indexOf(quote, start + 1)) {
+    const end = start + quote.length;
+    if (!boundary(source, start, end)) continue;
+    let left = 0;
+    let right = source.length;
+    for (const point of breaks) {
+      if (point <= start) left = point;
+      if (point >= end) { right = point; break; }
+    }
+    contexts.add(source.slice(left, right));
+  }
+  return [...contexts];
+}
+
 const technologies = [
   ["CI/CD", "ci/cd", "ci / cd", "continuous integration and continuous delivery", "continuous integration and continuous deployment"],
   ["microservices", "microservice", "microservices"],
@@ -43,6 +66,11 @@ export function affirmativeEvidence(text: string): boolean {
 }
 function usableSource(text: string): string {
   return clauses(text).filter(affirmativeEvidence).join("\n");
+}
+function affirmativeResumeSource(field: ProseField, resume: string): string {
+  return field.resumeEvidence?.length
+    ? field.resumeEvidence.filter(quote => evidenceContexts(resume, quote).some(affirmativeEvidence)).join("\n")
+    : usableSource(resume);
 }
 function clauses(text: string): string[] {
   // Keep decimal points and technical names intact; do not let a conditional in
@@ -71,7 +99,7 @@ function conditionalAddition(field: ProseField, clause: string): boolean {
   return field.path.endsWith(".recommendation") && conditionalAdvice.test(clause) && adviceAction.test(clause);
 }
 export function hasUnsupportedCandidateFact(field: ProseField, resume: string): boolean {
-  const source = usableSource(field.resumeEvidence?.length ? field.resumeEvidence.join("\n") : resume).toLowerCase();
+  const source = affirmativeResumeSource(field, resume).toLowerCase();
   return clauses(field.text).some(clause => !conditionalAddition(field, clause) && explicitCandidateFacts(clause).some(fact => !containsRequirementPhrase(source, fact.toLowerCase())));
 }
 export function reviewProse(data: AiReview): ProseField[] {
@@ -85,20 +113,25 @@ export function reviewProse(data: AiReview): ProseField[] {
     ...data.limitations.map((text, i) => ({ path: `limitations.${i}`, text })),
   ];
 }
+const quantityWord = "(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million)";
+const spelledQuantity = new RegExp(`\\b${quantityWord}(?:[ -]+(?:and[ -]+)?${quantityWord})*\\s+(?:years?|months?|percent|employees?|people|projects?|users?|customers?)\\b`, "gu");
 function numbers(text: string): string[] {
   return [
     ...(text.match(/\d+(?:[.,]\d+)*(?:%|\+)?/gu) ?? []),
     // Bounded common spelled quantities with units, not every use of 'one' in prose.
-    ...(text.toLowerCase().match(/\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|hundred|thousand)\s+(?:years?|months?|percent|employees?|people|projects?|users?|customers?)\b/gu) ?? []),
+    ...(text.toLowerCase().match(spelledQuantity) ?? []),
   ];
 }
 export function proseGroundingProblems(field: ProseField, resume: string, job?: string): ("introduced-number" | "unsupported-job-claim" | "unsupported-prose-claim")[] {
   const problems = new Set<"introduced-number" | "unsupported-job-claim" | "unsupported-prose-claim">();
-  const resumeSource = usableSource(field.resumeEvidence?.length ? field.resumeEvidence.join("\n") : resume);
+  const resumeSource = affirmativeResumeSource(field, resume);
   const jobSource = usableSource(field.jobEvidence ?? job ?? "");
   const candidateTechnologies = new Set(mentionedTechnologies(resumeSource));
   const jobTechnologies = new Set(mentionedTechnologies(jobSource));
   if (hasUnsupportedCandidateFact(field, resume)) problems.add("unsupported-prose-claim");
+  const resumeNumbers = new Set(numbers(resumeSource));
+  const jobNumbers = new Set(numbers(jobSource));
+  const combinedNumbers = new Set([...resumeNumbers, ...jobNumbers]);
   for (const clause of clauses(field.text)) {
     const attributedToJob = jobAttribution.test(clause);
     const candidateClaim = candidateAssertion.test(clause) || field.path.startsWith("strengths.");
@@ -108,14 +141,13 @@ export function proseGroundingProblems(field: ProseField, resume: string, job?: 
       // Job attribution is checked even when advice is conditional or the resume
       // happens to contain the technology. Resume skills never create job requirements.
       if (attributedToJob && !negativeJobClaim && !jobTechnologies.has(technology)) problems.add("unsupported-job-claim");
-      if (!advice && !negativeJobClaim && !(attributedToJob && !candidateClaim)
+      if (!advice && (!negativeJobClaim || candidateClaim) && !(attributedToJob && !candidateClaim)
         && !(candidateClaim ? candidateTechnologies.has(technology) : candidateTechnologies.has(technology) || jobTechnologies.has(technology))) problems.add("unsupported-prose-claim");
     }
     // Candidate numbers never borrow JD-only values. Mixed job explanations may
     // cite either source unless they explicitly assert a candidate achievement.
-    const numericSource = candidateClaim ? resumeSource
-      : attributedToJob ? jobSource : field.jobEvidence ? `${resumeSource}\n${jobSource}` : resumeSource;
-    const supplied = new Set(numbers(numericSource));
+    const supplied = candidateClaim ? resumeNumbers
+      : attributedToJob ? jobNumbers : field.jobEvidence ? combinedNumbers : resumeNumbers;
     if (numbers(clause).some(number => !supplied.has(number))) problems.add("introduced-number");
   }
   return [...problems];

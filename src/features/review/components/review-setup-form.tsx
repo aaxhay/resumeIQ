@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -19,7 +19,13 @@ import { createImprovementSession } from "@/lib/resume-improvement/editor";
 import type { ImprovementSession } from "@/lib/resume-improvement/contracts";
 import type { AiReview as AiReviewData } from "@/lib/ai-review/contracts";
 
+const subscribeToHydration = () => () => undefined;
+const clientReady = () => true;
+const serverReady = () => false;
+
 export function ReviewSetupForm() {
+  // Native file change events before hydration cannot safely populate React state.
+  const hydrated = useSyncExternalStore(subscribeToHydration, clientReady, serverReady);
   const setup = useReviewSetup();
   const [workspace, setWorkspace] = useState<{ initial: ImprovementSession; key: number }>();
   const [replacement, setReplacement] = useState<ImprovementSession>();
@@ -27,6 +33,7 @@ export function ReviewSetupForm() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [downloadComplete, setDownloadComplete] = useState(false);
   const hasDownloaded = useRef(false);
+  const previousScrollRestoration = useRef<ScrollRestoration | null>(null);
   const workspacePanel = useRef<HTMLDivElement>(null);
   const focusWorkspace = useRef(false);
   useEffect(() => {
@@ -36,16 +43,25 @@ export function ReviewSetupForm() {
       setDownloadComplete(show);
     };
     window.addEventListener("popstate", onBackOrForward);
-    return () => window.removeEventListener("popstate", onBackOrForward);
+    return () => {
+      window.removeEventListener("popstate", onBackOrForward);
+      if (previousScrollRestoration.current !== null) window.history.scrollRestoration = previousScrollRestoration.current;
+    };
   }, []);
   useEffect(() => {
     if (!downloadComplete && focusWorkspace.current) {
       focusWorkspace.current = false;
-      workspacePanel.current?.focus();
+      // Restore keyboard context without jumping back down the long editor.
+      workspacePanel.current?.focus({ preventScroll: true });
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     }
   }, [downloadComplete]);
   function downloadRequested() {
     hasDownloaded.current = true;
+    // Completion owns its scroll position, including Back/Forward. Otherwise the
+    // browser restores an old offset after the completion component focuses/resets.
+    if (previousScrollRestoration.current === null) previousScrollRestoration.current = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
     // A same-document route avoids unmounting the draft or revoking its download URL.
     const destination = new URL(window.location.href);
     destination.hash = "download-complete";
@@ -119,7 +135,7 @@ export function ReviewSetupForm() {
     <div hidden={downloadComplete} className="min-w-0 space-y-6">
       <Card>
         <form noValidate onSubmit={submit} aria-label="Resume review setup">
-          <fieldset disabled={setup.processing} className="min-w-0 space-y-8 disabled:opacity-70">
+          <fieldset disabled={!hydrated || setup.processing} className="min-w-0 space-y-8 disabled:opacity-70">
             <fieldset className="flex flex-wrap gap-3">
               <legend className="mb-3 text-sm font-semibold">Resume input</legend>
               <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border bg-background px-4 py-2.5 text-sm font-medium transition-colors hover:border-primary/50 has-checked:border-primary/40 has-checked:bg-accent/60 has-checked:text-primary"><input type="radio" name="resume-source" value="file" checked={setup.source === "file"} onChange={() => setup.changeSource("file")} className="size-4 accent-primary" /> Upload a file</label>

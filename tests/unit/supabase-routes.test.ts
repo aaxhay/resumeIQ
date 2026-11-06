@@ -174,6 +174,31 @@ describe("server-only optional authentication", () => {
     expect((await account.POST(request("/api/account", { action: "sign-out" }))).status).toBe(200);
     expect(mock.auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
   });
+  it("bounds stalled authentication bodies before reading and releases slots on cancellation", async () => {
+    const controllers = Array.from({ length: 4 }, () => new AbortController());
+    const cancels = controllers.map(() => vi.fn());
+    const requests = controllers.map((controller, index) => {
+      const init: RequestInit & { duplex: "half" } = {
+        method: "POST", headers: { Origin: "http://localhost:3100", "Content-Type": "application/json" },
+        body: new ReadableStream<Uint8Array>({ cancel: cancels[index] }),
+        signal: controller.signal, duplex: "half",
+      };
+      return account.POST(new Request("http://localhost:3100/api/account", init));
+    });
+    try {
+      await failure(await account.POST(request("/api/account", { action: "sign-out" })), 429, "BUSY");
+      expect(mock.create).not.toHaveBeenCalled();
+    } finally {
+      controllers.forEach(controller => controller.abort());
+      for (const pending of requests) await failure(await pending, 400, "INVALID_REQUEST");
+    }
+    for (const cancel of cancels) expect(cancel).toHaveBeenCalledOnce();
+    // Stalled/aborted reads consumed no Auth budget and released all resource slots.
+    for (let index = 0; index < 10; index++) expect((await account.POST(request("/api/account", { action: "sign-out" }))).status).toBe(200);
+    await failure(await account.POST(request("/api/account", { action: "sign-out" })), 429, "BUSY");
+    expect((await account.GET()).status).toBe(200);
+  });
+
   it("does not expose provider auth errors", async () => {
     mock.auth.signInWithPassword.mockResolvedValue({ data: {}, error: new Error("PRIVATE_DETAIL") });
     await failure(await account.POST(request("/api/account", { action: "sign-in", email: user.email, password: "test" })), 400, "AUTH_FAILED");

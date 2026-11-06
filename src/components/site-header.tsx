@@ -25,7 +25,7 @@ export function SiteHeader({ reviewPage = false }: { reviewPage?: boolean }) {
             {reviewPage ? (
               <span className="rounded-full border bg-muted px-3 py-1.5 text-xs text-muted-foreground">Text confirmation</span>
             ) : (
-              <Link href="/review" className={buttonVariants({ variant: "outline" })}>Get started <ArrowUpRight aria-hidden="true" /></Link>
+              <ReviewExitLink href="/review" className={buttonVariants({ variant: "outline" })}>Get started <ArrowUpRight aria-hidden="true" /></ReviewExitLink>
             )}
           </nav>
         </div>

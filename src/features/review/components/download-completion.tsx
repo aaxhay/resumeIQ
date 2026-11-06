@@ -11,7 +11,10 @@ import { EXPORT_FILENAME } from "@/lib/resume-export/contracts";
 export function DownloadCompletion({ onReturn, onStartOver }: { onReturn: () => void; onStartOver: () => void }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [confirmReset, setConfirmReset] = useState(false);
-  useEffect(() => { heading.current?.focus(); }, []);
+  useEffect(() => {
+    heading.current?.focus({ preventScroll: true });
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, []);
   return <Card>
     <section aria-labelledby="download-complete-title" className="min-w-0 space-y-5" data-testid="download-completion">
       <CheckCircle2 aria-hidden="true" className="size-9 text-primary" />

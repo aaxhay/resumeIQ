@@ -1,7 +1,7 @@
 import { AREAS, reviewSchema, rewriteSchema, type AiReview, type Rewrite } from "../../lib/ai-review/contracts.ts";
 import { invalidResponse } from "./errors.ts";
 import { encodeClaimProblems, type ClaimProblem } from "./claim-diagnostics.ts";
-import { affirmativeEvidence, containsInstruction, containsRequirementPhrase, literalEvidenceTerms, proseGroundingProblems, reviewProse } from "./grounding.ts";
+import { affirmativeEvidence, containsInstruction, containsRequirementPhrase, evidenceContexts, literalEvidenceTerms, proseGroundingProblems, reviewProse } from "../../lib/ai-review/grounding.ts";
 function exactQuotes(quotes: string[], source: string) {
   if (quotes.some(quote => !quote.trim() || !source.includes(quote))) throw invalidResponse("non-exact-evidence");
 }
@@ -33,18 +33,20 @@ export function validateReview(input: unknown, resume: string, job?: string): Ai
   const sourceTerms = new Set(literalEvidenceTerms(resume));
   for (const [index, match] of data.jobMatches.entries()) {
     exactQuotes([match.jobEvidence], job ?? ""); exactQuotes(match.resumeEvidence, resume);
-    if (containsInstruction(match.jobEvidence)) throw invalidResponse("instruction-as-job-evidence");
-    if (!containsRequirementPhrase(match.jobEvidence, match.requirement)) throw invalidResponse("requirement-not-in-job-evidence");
+    const jobContexts = evidenceContexts(job ?? "", match.jobEvidence);
+    if (containsInstruction(match.jobEvidence) || (jobContexts.length > 0 && jobContexts.every(containsInstruction))) throw invalidResponse("instruction-as-job-evidence");
+    if (!jobContexts.length || !containsRequirementPhrase(match.jobEvidence, match.requirement)) throw invalidResponse("requirement-not-in-job-evidence");
+    const affirmativeQuotes = match.resumeEvidence.filter(quote => evidenceContexts(resume, quote).some(affirmativeEvidence));
     if (match.status === "supported") {
       // Conjunction-separated requirements can be supported by separate exact quotes.
       // Every substantive term still needs literal lexical evidence; no inferred skills.
       const terms = literalEvidenceTerms(match.requirement).filter(term => !["and", "or", "and/or", "the", "a", "an", "with", "in", "of", "for", "to"].includes(term));
-      const supplied = new Set(literalEvidenceTerms(match.resumeEvidence.filter(affirmativeEvidence).join(" ")));
+      const supplied = new Set(literalEvidenceTerms(affirmativeQuotes.join(" ")));
       // Whole-source tokens also prevent a citation cut from JavaScript/ASP.NET
       // from manufacturing a Java/.NET token that never existed in the resume.
       if (!terms.length || terms.some(term => !supplied.has(term) || !sourceTerms.has(term))) claimProblems.push({ reason: "unsupported-requirement-claim", path: `jobMatches.${index}.status` });
     }
-    if (match.status === "partially_supported" && !match.resumeEvidence.length) throw invalidResponse("missing-partial-evidence");
+    if (match.status === "partially_supported" && !affirmativeQuotes.length) throw invalidResponse("missing-partial-evidence");
     if (match.status === "not_evidenced" && match.resumeEvidence.length) throw invalidResponse("conflicting-match-evidence");
   }
   // Source-scoped numeric checks and a deliberately bounded technology/attribution

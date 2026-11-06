@@ -119,9 +119,8 @@ test("missing history setup preserves signed-in identity and sign-out without fe
   await page.route("**/api/review-history", async route => { histories++; await route.fulfill({ status: 503, json: failure("HISTORY_NOT_READY") }); });
   await page.goto("/account");
   await expect(page.getByText(`Signed in as ${email}`)).toBeVisible();
-  const notice = page.getByText(/Saved history requires database setup/);
-  await expect(notice).toContainText("configure retention using docs/supabase.md");
-  await expect(notice).toContainText("Turning on the history flag alone does not create the tables");
+  await expect(page.getByText(/Saved history is unavailable on this deployment/)).toBeVisible();
+  await expect(page.getByText(/The operator must apply|Turning on the history flag/)).toHaveCount(0);
   await expect(page.getByText(/Saving is unavailable on this deployment/)).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Saved review summaries" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Refresh history" })).toHaveCount(0);
@@ -478,7 +477,8 @@ test("missing setup hides inline save controls without losing the current review
   const originalDraft = await draft.inputValue();
   await openSave(page);
   const panel = savePanel(page);
-  await expect(panel.getByText(/Saved history requires database setup/)).toBeVisible();
+  await expect(panel.getByText(/Saved history is unavailable on this deployment/)).toBeVisible();
+  await expect(panel.getByText(/The operator must apply|Turning on the history flag/)).toHaveCount(0);
   await expect(panel.getByText(`Signed in as ${email}`)).toBeVisible();
   await expect(panel.getByRole("button", { name: "Sign out", exact: true })).toBeEnabled();
   await expect(panel.getByRole("button", { name: "Save summary", exact: true })).toHaveCount(0);
