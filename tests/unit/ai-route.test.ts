@@ -309,6 +309,26 @@ describe("AI route through real request, privacy, validation, and guard boundari
     expect((await pending).status).toBe(200);
   });
 
+  it("advertises the cooldown after a provider failure and permits a fresh-ID retry after it", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    vi.resetModules();
+    ({ POST } = await import("@/app/api/reviews/route"));
+    provider.analyzeResume.mockRejectedValueOnce(new Error("PRIVATE_PROVIDER_FAILURE"));
+    const first = input();
+    const response = await POST(request(first));
+    await failure(response, 502, "PROVIDER_ERROR", true);
+    expect(response.headers.get("retry-after")).toBe("30");
+    await failure(await POST(request(input())), 409, "DUPLICATE", true);
+    expect(provider.analyzeResume).toHaveBeenCalledOnce();
+    vi.setSystemTime(29_999);
+    await failure(await POST(request(input())), 409, "DUPLICATE", true);
+    vi.setSystemTime(30_000);
+    expect((await POST(request(input()))).status).toBe(200);
+    expect(provider.analyzeResume).toHaveBeenCalledTimes(2);
+    await failure(await POST(request(first)), 409, "DUPLICATE", true);
+  });
+
   it("detects duplicate minimized documents even when contact details differ", async () => {
     expect((await POST(request(input({ resumeText: `${aiResume}\nfirst@example.invalid` })))).status).toBe(200);
     await failure(await POST(request(input({ resumeText: `${aiResume}\nsecond@example.invalid` }))), 409, "DUPLICATE", true);

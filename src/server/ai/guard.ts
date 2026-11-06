@@ -2,6 +2,8 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { AiError } from "./errors.ts";
 
+export const REVIEW_COOLDOWN_SECONDS = 30;
+
 /** Local process safety caps, not distributed abuse protection or a billing guarantee.
  * Only hashes/timestamps are retained, never documents or output. */
 export function createReviewGuard(now: () => number = Date.now) {
@@ -21,7 +23,7 @@ export function createReviewGuard(now: () => number = Date.now) {
     if (minuteCount >= 10 || dayCount >= 100) throw new AiError("RATE_LIMIT", "This server's local AI request allowance is exhausted. Retry later; daily limits may require waiting until the allowance resets.", 429, true);
     minuteCount++; dayCount++; active.add(hash); requests.set(requestId, time + 300_000);
     let released = false;
-    return () => { if (!released) { released = true; active.delete(hash); recent.set(hash, now() + 30_000); } };
+    return () => { if (!released) { released = true; active.delete(hash); recent.set(hash, now() + REVIEW_COOLDOWN_SECONDS * 1000); } };
   };
 }
 export const acquireReview = createReviewGuard();

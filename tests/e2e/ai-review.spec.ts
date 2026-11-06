@@ -307,6 +307,51 @@ test("timeout, rate-limit and network failures preserve previews and recover onl
   expect(new Set(requests.map(request => request.requestId)).size).toBe(4);
 });
 
+for (const [code, header, seconds] of [
+  ["DUPLICATE", "60", 60],
+  ["DUPLICATE", undefined, 60],
+  ["DUPLICATE", "invalid", 60],
+  ["PROVIDER_ERROR", "30", 30],
+] as const) {
+  test(`${code} cooldown (${header ?? "missing header"}) blocks early resubmission and requires an explicit retry`, async ({ page }, testInfo) => {
+    await page.clock.install();
+    const requests = await mockReviews(page, { post: async (route, body) => {
+      if (requests.length === 1) await route.fulfill({
+        status: code === "DUPLICATE" ? 409 : 502,
+        headers: header === undefined ? {} : { "Retry-After": header },
+        json: { ok: false, error: { code, message: "PRIVATE_ERROR_MUST_NOT_RENDER", retryable: true } },
+      });
+      else await route.fulfill({ json: success(body) });
+    } });
+    await prepare(page);
+    await authorize(page);
+    await page.clock.pauseAt(new Date(Date.now() + 60_000));
+    await send(page).click();
+    const retry = page.getByRole("button", { name: "Retry Gemini review", exact: true });
+    await expect(retry).toBeDisabled();
+    await expect(page.getByText(`You can retry in ${seconds} seconds. No retry is sent automatically.`, { exact: true })).toBeVisible();
+    await expect(resumeInput(page)).toHaveValue(prepareAiText(resume));
+    await expect(results(page)).toHaveCount(0);
+    await expect(page.getByText("PRIVATE_ERROR_MUST_NOT_RENDER")).toHaveCount(0);
+    if (code === "DUPLICATE" && header === "60") await page.screenshot({ path: testInfo.outputPath("retry-cooldown.png") });
+    // Even a programmatic submit must obey the cooldown, not just the disabled button.
+    await page.getByRole("form", { name: "Gemini review consent and previews" }).evaluate(form => {
+      if (form instanceof HTMLFormElement) form.requestSubmit();
+    });
+    await page.clock.fastForward((seconds - 1) * 1000);
+    await expect(retry).toBeDisabled();
+    expect(requests).toHaveLength(1);
+    await page.clock.fastForward(1000);
+    await expect(retry).toBeEnabled();
+    expect(requests).toHaveLength(1);
+    await retry.click();
+    await expect(results(page)).toBeVisible();
+    expect(requests).toHaveLength(2);
+    expect(requests[1]?.requestId).not.toBe(requests[0]?.requestId);
+    expect(requests[1]?.resumeText).toBe(requests[0]?.resumeText);
+  });
+}
+
 test("client review deadline aborts waiting and ignores a late response", async ({ page }) => {
   await page.clock.install();
   let release!: () => void;
