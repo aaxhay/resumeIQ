@@ -170,6 +170,19 @@ See [deployment runbook](deployment.md) and [presenter script](demo-script.md). 
 - [ ] Deploy and record the real URL; verify hosted PDF/DOCX/paste, both live review modes, evidence/editing/export, errors/cancellation/mobile, and secret boundaries.
 - [ ] Keep unrestricted public production blocked until operational/privacy/abuse controls are verified.
 
+## Final visual and independent-review follow-up (2026-11-07)
+
+See [final review and repair report](final-review-followup.md).
+
+- [x] Verify OS-aware/persistent/cross-tab light/dark theme, contrast, keyboard target, bounded CSS depth/motion and reduced-motion behavior; no document storage or remote fonts added.
+- [x] Inspect and reproduce before changes; report ranked findings and fix three high-priority source-evidence/browser-Back defects.
+- [x] Separate account body concurrency from validated Auth allowance; fix compound quantities and mixed negative-job/candidate assertions; reuse numeric sets and locate pure helpers in the shared library.
+- [x] Remove redundant extraction announcement and replace technical history setup box with unboxed truthful availability; preserve actual errors, consent and unavailable-save protection.
+- [x] Verify completion/return scroll to top, back/forward, retained accepted/saved/unsaved drafts, reset confirmation and hydration-safe setup controls.
+- [x] Pass final rebuilt full gate: **838 unit/integration tests in 25 files, 168 production browser/API tests**, lint, strict types and build; packaged paste/PDF/DOCX passed on Windows. Inspect actual desktop/dark-320px screenshots and verify scrollY 0 without overflow.
+- [ ] Correct two reproduced fail-closed AI reliability issues: employer extraction absorbs the following predicate; truthful description of negative experience can be rejected. Do not weaken evidence validation as a shortcut.
+- [ ] Live weak-general failure, hosted Supabase and Vercel/public-release gates remain unresolved. No new live-provider verification was performed in this follow-up.
+
 ## Phase 4 — Release hardening (day 2, remaining)
 
 - [ ] Pick hosting target; verify PDF bundling, upload limits, parser resources, and request deadlines there.
