@@ -1,5 +1,5 @@
 import "server-only";
-import { MAX_FILE_BYTES, MAX_RESUME_CHARACTERS } from "../../lib/resume/limits.ts";
+import { MAX_FILE_BYTES, MAX_FILE_LABEL, MAX_RESUME_CHARACTERS } from "../../lib/resume/limits.ts";
 import { pastedResumeSchema } from "../../lib/resume/contracts.ts";
 import { ResumeProcessingError } from "./errors.ts";
 import { validateDocument } from "./file-validation.ts";
@@ -12,22 +12,34 @@ export async function readBoundedBody(request: Request, limit: number): Promise<
   const chunks: Uint8Array[] = [];
   let size = 0;
   let timedOut = false;
-  const timer = setTimeout(() => { timedOut = true; void reader.cancel().catch(() => undefined); }, 15_000);
+  const cancel = () => { void reader.cancel().catch(() => undefined); };
+  const checkCancellation = () => {
+    if (timedOut) throw new ResumeProcessingError("TIMEOUT", "The upload took too long. Please try again.");
+    if (request.signal.aborted) throw new ResumeProcessingError("CANCELLED", "The upload was cancelled.");
+  };
+  const timer = setTimeout(() => { timedOut = true; cancel(); }, 15_000);
+  request.signal.addEventListener("abort", cancel, { once: true });
+  if (request.signal.aborted) cancel();
   try {
     for (;;) {
+      checkCancellation();
       const { value, done } = await reader.read();
-      if (timedOut) throw new ResumeProcessingError("TIMEOUT", "The upload took too long. Please try again.");
-      if (request.signal.aborted) throw new ResumeProcessingError("CANCELLED", "The upload was cancelled.");
+      checkCancellation();
       if (done) break;
       size += value.byteLength;
       if (size > limit) {
         await reader.cancel();
-        throw new ResumeProcessingError("FILE_TOO_LARGE", "The request is too large. Choose one file up to 5 MB, or paste up to 80,000 characters.");
+        throw new ResumeProcessingError("FILE_TOO_LARGE", `The request is too large. Choose one file up to ${MAX_FILE_LABEL}, or paste up to 80,000 characters.`);
       }
       chunks.push(value);
     }
+  } catch (error) {
+    checkCancellation();
+    throw error;
   } finally {
     clearTimeout(timer);
+    request.signal.removeEventListener("abort", cancel);
+    cancel();
     reader.releaseLock();
   }
   const body = new Uint8Array(size);

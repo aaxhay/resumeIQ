@@ -17,6 +17,7 @@ const failures: Readonly<Record<string, { issue: ValidationIssue; correctable: b
   "introduced-number": { issue: "unverified_number", correctable: true },
   "unsupported-requirement-claim": { issue: "job_claim", correctable: true },
   "requirement-not-in-job-evidence": { issue: "evidence", correctable: true },
+  "instruction-as-job-evidence": { issue: "job_claim", correctable: true },
   "output-token-limit": { issue: "output_limit", correctable: false },
   "oversized-output": { issue: "output_limit", correctable: false },
   "blocked-output": { issue: "blocked", correctable: false },
@@ -29,8 +30,9 @@ export function validationFailure(reason: unknown) {
   const problems = decodeClaimProblems(reason);
   if (problems) {
     const numbers = problems.some(problem => problem.reason === "introduced-number");
-    const matches = problems.some(problem => problem.reason === "unsupported-requirement-claim");
-    const issue: ValidationIssue = numbers && matches ? "unsupported_claim" : numbers ? "unverified_number" : "job_claim";
+    const matches = problems.some(problem => problem.reason === "unsupported-requirement-claim" || problem.reason === "unsupported-job-claim");
+    const prose = problems.some(problem => problem.reason === "unsupported-prose-claim");
+    const issue: ValidationIssue = prose || (numbers && matches) ? "unsupported_claim" : numbers ? "unverified_number" : "job_claim";
     return { issue, correctable: true };
   }
   // Schema diagnostics carry validator-generated paths/codes internally only.

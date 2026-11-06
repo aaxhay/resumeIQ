@@ -10,7 +10,10 @@ export class AccountError extends Error {
 export function historySetupMissing(error: { code?: string }): boolean {
   return ["PGRST205", "PGRST202", "42P01", "42883", "PGRST200"].includes(error.code ?? "");
 }
-export function historyStorageError(error: { code?: string }): AccountError {
+export function historyStorageError(error: { code?: string; message?: string }): AccountError {
+  // The existing migration uses 23514 for several constraints. Match only its exact
+  // review-cap marker; never classify arbitrary constraint errors as quota failures.
+  if (error.code === "23514" && error.message === "Saved review limit reached") return new AccountError("REVIEW_LIMIT", 409);
   return new AccountError(historySetupMissing(error) ? "HISTORY_NOT_READY" : "STORAGE_ERROR", 503);
 }
 export const privateHeaders = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", Vary: "Cookie" };

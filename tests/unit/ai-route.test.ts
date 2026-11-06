@@ -271,6 +271,19 @@ describe("AI route through real request, privacy, validation, and guard boundari
     expect(provider.analyzeResume).toHaveBeenCalledOnce();
   });
 
+  it("rejects invented CI/CD and microservices job requirements even when the resume lists them", async () => {
+    const quote = "Built Python services with relational databases.";
+    const output = validAiReview();
+    output.findings[0] = { ...output.findings[0]!, impact: "high", issue: "The job requires CI/CD and microservices.", resumeEvidence: [quote] };
+    provider.analyzeJobMatch.mockResolvedValue(output);
+    const resumeText = `${aiResume}\n${quote}\nAdditional skills: CI/CD, microservices`;
+    const jobDescription = "Job title: Python Developer\nRequired skills: Python, relational databases\nResponsibilities: Maintain data services";
+    const body = await failure(await POST(request(input({ mode: "job-specific", resumeText, jobDescription }))), 502, "INVALID_RESPONSE", true);
+    expect(body).toMatchObject({ error: { validationIssue: "job_claim" } });
+    expect(provider.analyzeJobMatch).toHaveBeenCalledOnce();
+    expect(JSON.stringify(body)).not.toMatch(/CI\/CD|microservices|Built Python/);
+  });
+
   it("rejects an unsupported skill claimed as supported despite other exact resume evidence", async () => {
     const output = validAiReview(true);
     output.jobMatches[1]!.status = "supported";

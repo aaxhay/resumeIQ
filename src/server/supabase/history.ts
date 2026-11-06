@@ -27,7 +27,10 @@ export async function saveReview(input: SaveReviewRequest) {
   const credentials = /AIza[0-9A-Za-z_-]{35}|sb_secret_[A-Za-z0-9_-]+|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|gh[pousr]_[A-Za-z0-9]{30,}|AKIA[A-Z0-9]{16}/u;
   const configuredSecrets = [process.env.GEMINI_API_KEY, process.env.SUPABASE_SERVICE_ROLE_KEY, process.env.SUPABASE_SECRET_KEY].filter((secret): secret is string => Boolean(secret && secret.length >= 12));
   if (credentials.test(serialized) || configuredSecrets.some(secret => serialized.includes(secret))) throw new AccountError("INVALID_REQUEST", 400);
-  const { client } = await authenticatedClient();
+  const { client, user } = await authenticatedClient();
+  // Consent is bound to the displayed account. This comparison never supplies ownership:
+  // the invoker RPC still derives its owner exclusively from the verified session's auth.uid().
+  if (value.expected_account_email !== user.email) throw new AccountError("ACCOUNT_CHANGED", 409);
   const { data, error } = await client.rpc("save_resume_review", {
     p_id: value.id, p_review_mode: value.review_mode, p_resume_filename: value.resume_filename,
     p_analysis_result: value.analysis_result, p_suggestions: value.suggestions,

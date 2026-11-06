@@ -42,11 +42,11 @@ export function useAccount() {
       document.removeEventListener("visibilitychange", revalidate);
     };
   }, [refresh]);
-  const expire = useCallback(() => {
+  const expire = useCallback((message?: string) => {
     cancel();
     setAccount(value => value ? { ...value, user: null } : null);
     setNotice("");
-    setError("Your session has expired. Private history has been cleared from this page. Sign in again to continue.");
+    setError(message ?? "Your session has expired. Private history has been cleared from this page. Sign in again to continue.");
   }, [cancel]);
   async function authenticate(action: Action) {
     const parsed = accountActionSchema.safeParse(action);

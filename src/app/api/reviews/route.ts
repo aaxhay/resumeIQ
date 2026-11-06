@@ -9,6 +9,8 @@ import { AiError, safeAiFailure } from "@/server/ai/errors";
 import { validateReview } from "@/server/ai/validate";
 
 export const runtime = "nodejs";
+// The adapter's 60s shared deadline must expire before the host terminates it.
+export const maxDuration = 90;
 const headers = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 // Explicit operator attestation, not auto-detection of billing or legal compliance.
 const personalDataEnabled = () => process.env.GEMINI_DATA_POLICY === "paid-reviewed";

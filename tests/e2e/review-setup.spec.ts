@@ -90,7 +90,7 @@ test("rejects invalid, empty, oversized, and disguised files and recovers", asyn
   for (const [file, message] of [
     [{ ...pdf, name: "resume.doc" }, "Choose a PDF or DOCX"],
     [{ ...pdf, buffer: Buffer.alloc(0) }, "empty or unreadable"],
-    [{ ...pdf, buffer: Buffer.alloc(5 * 1024 * 1024 + 1) }, "too large"],
+    [{ ...pdf, buffer: Buffer.alloc(4 * 1024 * 1024 + 1) }, "too large"],
     [{ ...pdf, buffer: Buffer.from("not a PDF") }, "header does not match"],
     [{ ...pdf, mimeType: "image/png" }, "type does not match"],
   ] as const) {
@@ -126,6 +126,35 @@ test("server parsing failure offers pasted text and validates user edits", async
   await editor.fill(syntheticResume);
   await page.getByRole("button", { name: "Confirm resume text" }).click();
   await expect(ready(page)).toBeVisible();
+});
+
+test("corrupted DOCX is rejected by the server and allows pasted-text recovery", async ({ page }) => {
+  await page.getByLabel("Choose resume file").setInputFiles({ name: "corrupt.docx", mimeType: docxType, buffer: Buffer.from([0x50, 0x4b, 0x03, 0x04, 0, 0, 0, 0]) });
+  const response = page.waitForResponse(value => value.url().includes("/api/resume/extract") && value.request().method() === "POST");
+  await upload(page).click();
+  const rejected = await response;
+  expect(rejected.status()).toBe(422);
+  expect(await rejected.json()).toMatchObject({ ok: false, error: { code: "MALFORMED_FILE" } });
+  await expect(alerts(page)).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Editable resume text" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Use pasted text instead" }).click();
+  await page.getByRole("textbox", { name: "1. Paste your resume text" }).fill(syntheticResume);
+  await page.getByRole("button", { name: "Prepare pasted text" }).click();
+  await expect(page.getByRole("textbox", { name: "Editable resume text" })).toHaveValue(syntheticResume);
+});
+
+test("extraction network interruption preserves input and permits explicit retry", async ({ page }) => {
+  await page.route("**/api/resume/extract", route => route.abort("failed"));
+  await page.getByRole("radio", { name: "Paste resume text", exact: true }).check();
+  const pasted = page.getByRole("textbox", { name: "1. Paste your resume text" });
+  await pasted.fill(syntheticResume);
+  await page.getByRole("button", { name: "Prepare pasted text" }).click();
+  await expect(alerts(page)).toContainText("couldn’t reach the document processor");
+  await expect(pasted).toHaveValue(syntheticResume);
+  await expect(page.getByRole("textbox", { name: "Editable resume text" })).toHaveCount(0);
+  await page.unroute("**/api/resume/extract");
+  await page.getByRole("button", { name: "Prepare pasted text" }).click();
+  await expect(page.getByRole("textbox", { name: "Editable resume text" })).toHaveValue(syntheticResume);
 });
 
 test("shows short-extraction warnings separately from resume quality", async ({ page }) => {

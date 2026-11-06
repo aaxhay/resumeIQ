@@ -1,11 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 import { normalizeResumeText } from "@/server/resume-processing/normalize";
 import { assessExtraction } from "@/server/resume-processing/quality";
 import { processResume } from "@/server/resume-processing/process-resume";
 import { validateDocument } from "@/server/resume-processing/file-validation";
 import { safeFailure } from "@/server/resume-processing/errors";
-import { parseExtractionRequest } from "@/server/resume-processing/request";
+import { parseExtractionRequest, readBoundedBody } from "@/server/resume-processing/request";
 import { resumeTextSchema } from "@/lib/resume/contracts";
 import { MAX_FILE_BYTES } from "@/lib/resume/limits";
 import { syntheticPdf, syntheticResume } from "../fixtures/pdf";
@@ -70,6 +70,50 @@ describe("real synthetic document processing", () => {
     const data = await processResume({ kind: "pasted", text: `  ${syntheticResume}\r\n` });
     expect(data.text).toBe(syntheticResume);
     expect(data.source).toBe("pasted");
+  });
+});
+
+describe("upload stream cancellation", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it.each([false, true])("cancels stalled uploads immediately, including pre-aborted requests (%s)", async preAborted => {
+    vi.useFakeTimers();
+    const abort = new AbortController();
+    const cancel = vi.fn();
+    const stream = new ReadableStream<Uint8Array>({ cancel });
+    const request = new Request("http://localhost", {
+      method: "POST", body: stream, duplex: "half", signal: abort.signal,
+    } as RequestInit);
+    if (preAborted) abort.abort();
+    const result = readBoundedBody(request, 1024);
+    if (!preAborted) abort.abort();
+    // No time is advanced and no chunk arrives: abort itself must unblock read().
+    await expect(result).rejects.toMatchObject({ code: "CANCELLED" });
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(stream.locked).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("retains the timeout failure and releases a stalled stream", async () => {
+    vi.useFakeTimers();
+    const cancel = vi.fn();
+    const stream = new ReadableStream<Uint8Array>({ cancel });
+    const request = new Request("http://localhost", { method: "POST", body: stream, duplex: "half" } as RequestInit);
+    const result = expect(readBoundedBody(request, 1024)).rejects.toMatchObject({ code: "TIMEOUT" });
+    await vi.advanceTimersByTimeAsync(15_000);
+    await result;
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(stream.locked).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("releases the body reader after network interruption without exposing stream errors", async () => {
+    const stream = new ReadableStream<Uint8Array>({ start(controller) { controller.error(new Error("PRIVATE_UPLOAD_DETAIL")); } });
+    const request = new Request("http://localhost", { method: "POST", body: stream, duplex: "half" } as RequestInit);
+    const result = await readBoundedBody(request, 1024).catch(safeFailure);
+    expect(result).toMatchObject({ ok: false, error: { code: "PROCESSING_FAILED" } });
+    expect(JSON.stringify(result)).not.toContain("PRIVATE_UPLOAD_DETAIL");
+    expect(stream.locked).toBe(false);
   });
 });
 

@@ -25,6 +25,8 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 const correctionCases: { name: string; reason: string; job?: boolean; mutate: (data: AiReview) => void }[] = [
+  { name: "invented job requirements in prose", reason: "claim-checks:unsupported-job-claim@findings.0.issue", job: true, mutate: data => { data.findings[0]!.issue = "The job requires CI/CD and microservices."; } },
+  { name: "invented candidate credential", reason: "claim-checks:unsupported-prose-claim@strengths.0.explanation", mutate: data => { data.strengths[0]!.explanation = "Your Kubernetes certification demonstrates expertise."; } },
   { name: "duplicate areas", reason: "incomplete-area-coverage", mutate: data => { data.areas[0] = data.areas[1]!; } },
   { name: "duplicate finding IDs", reason: "duplicate-finding-id", mutate: data => { data.findings.push(data.findings[0]!); } },
   { name: "missing high-impact evidence", reason: "missing-high-impact-evidence", mutate: data => { data.findings[0]!.impact = "high"; data.findings[0]!.resumeEvidence = []; } },

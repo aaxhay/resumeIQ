@@ -20,7 +20,8 @@ const MAIN_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordpro
 const RELATIONSHIP_CONTENT_TYPE = "application/vnd.openxmlformats-package.relationships+xml";
 
 type XmlChild = { name: string; namespace: string; attributes: Record<string, string> };
-type XmlSummary = { name: string; namespace: string; hasBody: boolean; children: XmlChild[] };
+type XmlSummary = { name: string; namespace: string; hasBody: boolean; hasWordText: boolean; children: XmlChild[] };
+export type DocxArchiveInspection = { hasHeaderFooterText: boolean };
 
 function malformed(): never {
   throw new ResumeProcessingError("MALFORMED_FILE", "This DOCX is invalid or damaged. Save a fresh DOCX, or paste your resume text instead.");
@@ -53,8 +54,9 @@ function inspectXml(bytes: Buffer, collectChildren: boolean): XmlSummary {
   const declaration = /^\s*<\?xml\s[^?]*encoding\s*=\s*["']([^"']+)["']/iu.exec(xml);
   if (declaration && !/^utf-?8$/iu.test(declaration[1] ?? "")) malformed();
 
-  const summary: XmlSummary = { name: "", namespace: "", hasBody: false, children: [] };
+  const summary: XmlSummary = { name: "", namespace: "", hasBody: false, hasWordText: false, children: [] };
   const scopes: Map<string, string>[] = [];
+  const wordTextElements: boolean[] = [];
   let roots = 0;
   const parser = new Parser({
     onopentag(name, attributes) {
@@ -79,9 +81,13 @@ function inspectXml(bytes: Buffer, collectChildren: boolean): XmlSummary {
         }
       }
       scopes.push(scope);
+      wordTextElements.push(localName === "t" && WORD_NS.has(namespace));
     },
-    onclosetag() { scopes.pop(); },
-    ontext(text) { if (scopes.length === 0 && text.trim()) malformed(); },
+    onclosetag() { scopes.pop(); wordTextElements.pop(); },
+    ontext(text) {
+      if (scopes.length === 0 && text.trim()) malformed();
+      if (wordTextElements.at(-1) && text.trim()) summary.hasWordText = true;
+    },
   }, { xmlMode: true, decodeEntities: true });
   parser.end(xml);
   if (roots !== 1) malformed();
@@ -149,7 +155,7 @@ function verifyPackage(names: Set<string>, xmlParts: Map<string, XmlSummary>): v
 }
 
 /** Screen every entry in memory before Mammoth gets access to the archive. */
-export async function validateDocxArchive(bytes: Buffer): Promise<void> {
+export async function validateDocxArchive(bytes: Buffer): Promise<DocxArchiveInspection> {
   if (bytes.length > MAX_FILE_BYTES) {
     throw new ResumeProcessingError("FILE_TOO_LARGE", "This DOCX exceeds the upload size limit. Try a smaller file, or paste your resume text instead.");
   }
@@ -210,6 +216,10 @@ export async function validateDocxArchive(bytes: Buffer): Promise<void> {
       }
       if (entryCount !== archive.entryCount) malformed();
       verifyPackage(names, xmlParts);
+      return {
+        hasHeaderFooterText: [...xmlParts.values()].some(part => WORD_NS.has(part.namespace)
+          && (part.name === "hdr" || part.name === "ftr") && part.hasWordText),
+      };
     } finally { archive.close(); }
   } catch (error) {
     if (error instanceof ResumeProcessingError) throw error;

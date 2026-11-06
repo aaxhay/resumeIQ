@@ -57,7 +57,7 @@ describe("local file header screening", () => {
   it("formats file sizes for display", () => {
     expect(formatFileSize(512)).toBe("1 KB");
     expect(formatFileSize(1024)).toBe("1 KB");
-    expect(formatFileSize(MAX_FILE_BYTES)).toBe("5.0 MB");
+    expect(formatFileSize(MAX_FILE_BYTES)).toBe("4.0 MB");
   });
 });
 

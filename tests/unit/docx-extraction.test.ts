@@ -1,5 +1,8 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import mammoth from "mammoth";
+import { Document, ExternalHyperlink, Footer, Header, Packer, Paragraph, TextRun } from "docx";
+import { extractionResponseSchema, warningSchema } from "../../src/lib/resume/contracts.ts";
+import { processResume } from "../../src/server/resume-processing/process-resume.ts";
 import { MAX_EXPANDED_BYTES, MAX_FILE_BYTES, MAX_XML_BYTES, MAX_ZIP_ENTRIES } from "../../src/lib/resume/limits.ts";
 import { extractDocx } from "../../src/server/resume-processing/docx.ts";
 import { docxHtmlToText } from "../../src/server/resume-processing/docx-text.ts";
@@ -35,6 +38,71 @@ describe("DOCX extraction", () => {
 
   it("returns empty raw text for a valid empty document", async () => {
     expect((await extractDocx(await syntheticDocx(""))).text).toBe("");
+  });
+
+  it.each(["header", "footer", "both"])("refuses a real DOCX with meaningful %s text rather than silently dropping it", async location => {
+    const bytes = await Packer.toBuffer(new Document({ sections: [{
+      ...(location !== "footer" ? { headers: { default: new Header({ children: [new Paragraph("Synthetic Candidate | synthetic@example.invalid")] }) } } : {}),
+      ...(location !== "header" ? { footers: { default: new Footer({ children: [new Paragraph("Certification: Synthetic Certificate 2024")] }) } } : {}),
+      children: [new Paragraph("Experience"), new Paragraph("Built reliable software services for fictional teams and improved the test suite across all internal tools. Delivered documented release processes and maintained TypeScript applications for synthetic customers. Worked with a collaborative engineering team to plan and test the release.")],
+    }] }));
+    const convert = vi.spyOn(mammoth, "convertToHtml");
+    await expect(extractDocx(bytes)).rejects.toMatchObject({
+      code: "UNSUPPORTED_FORMAT",
+      message: expect.stringMatching(/header or footer text.*paste the complete resume/u),
+    });
+    expect(convert).not.toHaveBeenCalled();
+  });
+
+  it("allows empty headers and footers without losing body text", async () => {
+    const text = "Synthetic Candidate — all contact details and qualifications are in the body.";
+    const bytes = await Packer.toBuffer(new Document({ sections: [{
+      headers: { default: new Header({ children: [new Paragraph("  ")] }) },
+      footers: { default: new Footer({ children: [new Paragraph("")] }) },
+      children: [new Paragraph(text)],
+    }] }));
+    expect(await extractDocx(bytes)).toEqual({ text, warnings: [] });
+  });
+
+  it("warns about hidden destinations in a real DOCX without changing visible text or exposing URLs", async () => {
+    const body = "Built reliable software services for fictional teams and improved the test suite across all internal tools. Delivered documented release processes and maintained TypeScript applications for synthetic customers. Worked with a collaborative engineering team to plan and test the release.";
+    const bytes = await Packer.toBuffer(new Document({ sections: [{ children: [
+      new Paragraph("Synthetic Candidate"),
+      new Paragraph({ children: [
+        new ExternalHyperlink({ children: [new TextRun("Email")], link: "mailto:synthetic@example.invalid" }),
+        new TextRun(" | "),
+        new ExternalHyperlink({ children: [new TextRun("Profile")], link: "https://example.invalid/PRIVATE_DESTINATION" }),
+      ] }),
+      new Paragraph(body),
+    ] }] }));
+    const result = await processResume({ kind: "docx", bytes });
+    expect(result.text).toBe(`Synthetic Candidate\n\nEmail | Profile\n\n${body}`);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toMatchObject({ code: "partial", message: expect.stringMatching(/copy any needed email addresses, contact links, or profile URLs.*before confirming or exporting/u) });
+    expect(extractionResponseSchema.safeParse({ ok: true, data: result }).success).toBe(true);
+    expect(warningSchema.safeParse(result.warnings[0]).success).toBe(true);
+    expect(JSON.stringify(result)).not.toMatch(/synthetic@example\.invalid|PRIVATE_DESTINATION|<a\b/u);
+  });
+
+  it("bounds static hyperlink warnings independently of converter warnings and link count", async () => {
+    vi.spyOn(mammoth, "convertToHtml").mockResolvedValue({
+      value: `<p>${'<a href="https://example.invalid/PRIVATE_DESTINATION">Profile</a> '.repeat(300)}</p>`,
+      messages: Array.from({ length: 30 }, () => ({ type: "warning" as const, message: "PRIVATE_CONVERTER_DETAIL" })),
+    });
+    const result = await extractDocx(original);
+    expect(result.warnings.map(warning => warning.code)).toEqual(["conversion", "partial"]);
+    expect(result.warnings.every(warning => warningSchema.safeParse(warning).success)).toBe(true);
+    expect(JSON.stringify(result)).not.toMatch(/PRIVATE_DESTINATION|PRIVATE_CONVERTER_DETAIL/u);
+  });
+
+  it("ignores bookmark-only and escaped links while retaining the text limit for real links", () => {
+    const onLink = vi.fn();
+    expect(docxHtmlToText('<p><a href="#section">Section</a> &lt;a href="hidden"&gt;literal&lt;/a&gt;</p>', onLink))
+      .toBe('Section <a href="hidden">literal</a>');
+    expect(onLink).not.toHaveBeenCalled();
+    expect(() => docxHtmlToText(`<p><a href="https://example.invalid">${"x".repeat(80_001)}</a></p>`, onLink))
+      .toThrow(expect.objectContaining({ code: "RESOURCE_LIMIT" }));
+    expect(onLink).toHaveBeenCalledWith();
   });
 
   it("keeps literal escaped markup as inert text and never exposes HTML attributes", () => {

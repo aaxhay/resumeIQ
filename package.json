@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ai:live": "node --env-file=.env.local --conditions=react-server scripts/verify-gemini.ts",
+    "test:worker:package": "node scripts/verify-worker-package.ts",
     "test:e2e": "playwright test",
     "test:e2e:dev": "playwright test --config=playwright.dev.config.ts",
     "check": "npm run lint && npm run typecheck && npm test && npm run build && npm run test:e2e"

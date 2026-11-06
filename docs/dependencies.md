@@ -61,7 +61,7 @@ The checked latest ESLint was 10.14.0. Next's dependency `eslint-plugin-react` 7
 
 ## Security audit snapshot
 
-Audit rerun after installing Supabase runtime packages and development-only PGlite on 2026-11-06 (unchanged findings from the DOCX/Gemini milestones):
+Audit rerun during independent QA on **2026-11-07**, without dependency changes (unchanged findings from the Supabase/DOCX/Gemini milestones). Runtime audit exited 0; full audit exited 1:
 
 - `npm audit --omit=dev`: **0 reported vulnerabilities**.
 - Full `npm audit`: **13 affected dependency entries — 2 low, 11 moderate; no high or critical**. These are development/build tooling dependencies, not 13 independent root vulnerabilities.

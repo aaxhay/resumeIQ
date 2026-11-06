@@ -2,7 +2,7 @@
 
 ## Direction
 
-Quiet, professional productivity software: warm-white surfaces, deep ink typography, and restrained green accents. Hierarchy comes from spacing and type, not gradients, fake metrics, logos, or decorative dashboards. No third-party branding/assets and no remote font downloads.
+Professional productivity software with warm-white or deep charcoal surfaces, clear typography, and green accents. Hierarchy comes from spacing and type; the landing hero adds a restrained glow, layered 3D surfaces, and a decorative sphere—not fake results, metrics, or dashboards. No third-party branding/assets, WebGL dependency, or remote font downloads.
 
 ## Tokens
 
@@ -22,13 +22,15 @@ Source of truth: `src/app/globals.css`. Tailwind v4 maps semantic utilities to C
 | Focus | `ring` / `#287c65` | Visible 2px outlines, offset from controls |
 | Error | `destructive` / `#b32e36` | Validation text and error borders |
 
-Light theme only in this phase; no dead theme toggle. The landing privacy panel uses a dark green editorial surface with light text, not an application dark mode.
+Dark theme uses separately selected tokens: canvas `#0c1517`, surface `#142123`, foreground `#e8f1ed`, supporting text `#acbfb8`, primary `#85e2bf`, primary foreground `#0c2b21`, and error `#ff969c`. Forms, notices, results, editing, and account surfaces inherit semantic tokens. Primary hover has a theme-specific color rather than lowering text contrast. The privacy panel retains its dark editorial surface in both modes.
+
+The header's real keyboard-accessible theme toggle follows the OS initially and persists only `resumeiq-color-theme` (`light`/`dark`) in localStorage. It never persists a document or review. A static, application-owned head script applies the preference before first paint; React subscribes to theme/system/storage changes without rendering different application content during hydration. The root-only hydration exception accounts for this deliberately set class. Storage denial does not prevent in-page toggling.
 
 ## Typography and layout
 
-- System stack: Segoe UI, Arial, Helvetica, sans-serif. No network dependency.
-- Body: generally 16px with generous line height; supporting copy 14px, metadata 12px.
-- Headings: semibold, tight tracking; hero 36px mobile / 60px from `sm`, section headings 30–36px.
+- System stack: Segoe UI Variable, Segoe UI, Apple/Blink system fonts, Arial, Helvetica, sans-serif. No network dependency.
+- Body: explicit 16px with relaxed line height; supporting copy 14px, metadata 12px.
+- Headings: local display stack (Segoe UI Variable Display, Aptos Display, SF Pro Display, system fallback), semibold, balanced wrapping and tight tracking; hero 42px mobile / 60px from `sm` / 64px from `lg`, section headings 30–36px.
 - Text fields: 16px to avoid mobile input zoom; multiline fields have a visible resize affordance.
 - Standard Tailwind 4px spacing unit: favor 8, 12, 16, 24, 32, 48, 64, and 96px intervals.
 - Container: max-width `max-w-6xl`; horizontal padding 20px mobile, 32px at `sm`, 40px at `lg`.
@@ -41,7 +43,7 @@ Use 1px solid borders for cards and inputs; 2px dashed border for file drop area
 
 ## Reusable controls
 
-- `Button` / `buttonVariants`: existing shadcn Base UI primitive customized to 44px default / 48px large targets; primary, outline, secondary, ghost, destructive, and link variants. Use real `Link`/anchor elements styled with `buttonVariants` for navigation.
+- `Button` / `buttonVariants`: existing shadcn Base UI primitive with 44px minimum targets (including small/icon variants), 48px large targets, wrapping labels and visible offset focus rings; primary, outline, secondary, ghost, destructive, and link variants. Use real `Link`/anchor elements styled with `buttonVariants` for navigation.
 - `Card`: surface, padding, border, radius, and small shadow; page content supplies semantic headings/sections.
 - `Textarea` / `.field-control`: default, hover, focus, invalid, disabled, and placeholder states share tokens. `aria-invalid` controls error styling. Labels and instructions are always outside the placeholder.
 - `Notice`: info, success, or error appearance; caller chooses appropriate `role`, labeling, or focus behavior.
@@ -57,5 +59,12 @@ Use 1px solid borders for cards and inputs; 2px dashed border for file drop area
 - Selection, errors, and success are described in text as well as color/icons.
 - Layout stacks on small screens and wraps long filenames. No fixed-width text blocks or clipped job descriptions.
 - Global `prefers-reduced-motion` rule disables unnecessary animation/transition; focus remains visible.
+
+## Motion and depth
+
+- Hero text/panel enter once in 700–900ms; the decorative sphere settles once in 1.6 seconds. No infinite ambient animation, scroll hijacking, or autoplay video.
+- Layered CSS sheets and a shaded sphere provide depth without invented document content. Decorative elements are hidden from assistive technology and ignore pointer events.
+- The hero's actual 3D hover transform is limited to large, fine-pointer screens. Touch layouts do not depend on hover. CTA arrows and borders have brief interaction transitions.
+- `prefers-reduced-motion` disables entry effects and hover movement. Forced-colors mode removes decorative layers and restores ordinary headline text.
 
 Keyboard/browser checks are not a full WCAG audit. No assistive-technology certification, physical-device testing, or cross-engine coverage is claimed.

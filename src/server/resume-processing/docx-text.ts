@@ -7,8 +7,9 @@ import { ResumeProcessingError } from "./errors.ts";
 const BLOCKS = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6", "div", "blockquote"]);
 const IGNORED = new Set(["script", "style", "template", "iframe", "object", "noscript"]);
 
-/** Consume converter HTML as data only; no HTML leaves the server extractor. */
-export function docxHtmlToText(html: string): string {
+/** Consume converter HTML as data only; no HTML leaves the server extractor.
+ * Report omitted link destinations without exposing or appending their values. */
+export function docxHtmlToText(html: string, onLinkDestination?: () => void): string {
   let text = "";
   let ignoredDepth = 0;
   let listItemDepth = 0;
@@ -30,6 +31,7 @@ export function docxHtmlToText(html: string): string {
   const parser = new Parser({
     onopentag(name, attributes) {
       if (ignoredDepth || IGNORED.has(name)) { ignoredDepth++; return; }
+      if (name === "a" && attributes.href?.trim() && !attributes.href.trim().startsWith("#")) onLinkDestination?.();
       if (name === "ul" || name === "ol") {
         boundary(1);
         const start = Number(attributes.start ?? 1);

@@ -1,8 +1,7 @@
 import { AREAS, reviewSchema, rewriteSchema, type AiReview, type Rewrite } from "../../lib/ai-review/contracts.ts";
 import { invalidResponse } from "./errors.ts";
 import { encodeClaimProblems, type ClaimProblem } from "./claim-diagnostics.ts";
-
-const normalized = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}+#]+/gu, " ").trim();
+import { affirmativeEvidence, containsInstruction, containsRequirementPhrase, literalEvidenceTerms, proseGroundingProblems, reviewProse } from "./grounding.ts";
 function exactQuotes(quotes: string[], source: string) {
   if (quotes.some(quote => !quote.trim() || !source.includes(quote))) throw invalidResponse("non-exact-evidence");
 }
@@ -10,7 +9,7 @@ function exactQuotes(quotes: string[], source: string) {
  * This is not a proof that a shortened excerpt preserves every nuance. User review remains required. */
 export function validateRewrite(input: unknown, source: string): Rewrite {
   const result = rewriteSchema.safeParse(input);
-  if (!result.success || !source.includes(result.data.original) || !result.data.original.includes(result.data.revised)) throw invalidResponse("non-extractive-rewrite");
+  if (!result.success || !result.data.revised.trim() || !source.includes(result.data.original) || !result.data.original.includes(result.data.revised)) throw invalidResponse("non-extractive-rewrite");
   return result.data;
 }
 export function validateReview(input: unknown, resume: string, job?: string): AiReview {
@@ -31,33 +30,27 @@ export function validateReview(input: unknown, resume: string, job?: string): Ai
   // invented matches; the job inventory will retain extracted items as unassessed.
   if (!job && data.jobMatches.length) throw invalidResponse("unexpected-job-matches");
   const claimProblems: ClaimProblem[] = [];
+  const sourceTerms = new Set(literalEvidenceTerms(resume));
   for (const [index, match] of data.jobMatches.entries()) {
     exactQuotes([match.jobEvidence], job ?? ""); exactQuotes(match.resumeEvidence, resume);
-    if (!normalized(match.jobEvidence).includes(normalized(match.requirement))) throw invalidResponse("requirement-not-in-job-evidence");
+    if (containsInstruction(match.jobEvidence)) throw invalidResponse("instruction-as-job-evidence");
+    if (!containsRequirementPhrase(match.jobEvidence, match.requirement)) throw invalidResponse("requirement-not-in-job-evidence");
     if (match.status === "supported") {
       // Conjunction-separated requirements can be supported by separate exact quotes.
       // Every substantive term still needs literal lexical evidence; no inferred skills.
-      const terms = normalized(match.requirement).split(" ").filter(term => !["and", "or", "the", "a", "an", "with", "in", "of", "for", "to"].includes(term));
-      const supplied = ` ${normalized(match.resumeEvidence.join(" "))} `;
-      if (!terms.length || terms.some(term => !supplied.includes(` ${term} `))) claimProblems.push({ reason: "unsupported-requirement-claim", path: `jobMatches.${index}.status` });
+      const terms = literalEvidenceTerms(match.requirement).filter(term => !["and", "or", "and/or", "the", "a", "an", "with", "in", "of", "for", "to"].includes(term));
+      const supplied = new Set(literalEvidenceTerms(match.resumeEvidence.filter(affirmativeEvidence).join(" ")));
+      // Whole-source tokens also prevent a citation cut from JavaScript/ASP.NET
+      // from manufacturing a Java/.NET token that never existed in the resume.
+      if (!terms.length || terms.some(term => !supplied.has(term) || !sourceTerms.has(term))) claimProblems.push({ reason: "unsupported-requirement-claim", path: `jobMatches.${index}.status` });
     }
     if (match.status === "partially_supported" && !match.resumeEvidence.length) throw invalidResponse("missing-partial-evidence");
     if (match.status === "not_evidenced" && match.resumeEvidence.length) throw invalidResponse("conflicting-match-evidence");
   }
-  // Reject introduced numbers throughout generated assessment/recommendation prose.
-  // Numbers in exact job quotes are not candidate achievements; rewrites are checked against their own original.
-  const suppliedNumbers = new Set((resume + "\n" + (job ?? "")).match(/\d+(?:[.,]\d+)*(?:%|\+)?/gu) ?? []);
-  const prose: { path: string; text: string }[] = [
-    { path: "assessment", text: data.assessment },
-    ...data.priorities.flatMap((x, i) => [{ path: `priorities.${i}.title`, text: x.title }, { path: `priorities.${i}.recommendation`, text: x.recommendation }]),
-    ...data.strengths.flatMap((x, i) => [{ path: `strengths.${i}.title`, text: x.title }, { path: `strengths.${i}.explanation`, text: x.explanation }]),
-    ...data.areas.map((x, i) => ({ path: `areas.${i}.explanation`, text: x.explanation })),
-    ...data.findings.flatMap((x, i) => [{ path: `findings.${i}.issue`, text: x.issue }, { path: `findings.${i}.whyItMatters`, text: x.whyItMatters }, { path: `findings.${i}.recommendation`, text: x.recommendation }]),
-    ...data.jobMatches.flatMap((x, i) => [{ path: `jobMatches.${i}.explanation`, text: x.explanation }, { path: `jobMatches.${i}.recommendation`, text: x.recommendation }]),
-    ...data.limitations.map((text, i) => ({ path: `limitations.${i}`, text })),
-  ];
-  for (const field of prose) {
-    if ((field.text.match(/\d+(?:[.,]\d+)*(?:%|\+)?/gu) ?? []).some(number => !suppliedNumbers.has(number))) claimProblems.push({ reason: "introduced-number", path: field.path });
+  // Source-scoped numeric checks and a deliberately bounded technology/attribution
+  // guard supplement exact quotes. They do not prove arbitrary semantic claims.
+  for (const field of reviewProse(data)) {
+    for (const reason of proseGroundingProblems(field, resume, job)) claimProblems.push({ reason, path: field.path });
   }
   if (claimProblems.length) throw invalidResponse(encodeClaimProblems(claimProblems));
   return data;

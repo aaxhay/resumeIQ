@@ -17,7 +17,7 @@ export const savedSuggestionSchema = z.object({
   status: z.enum(["pending", "accepted", "rejected", "manually_edited"]),
 }).strict();
 export const saveReviewRequestSchema = z.object({
-  id: z.uuid(), consent: z.literal(true), review_mode: z.enum(["general", "job-specific"]),
+  id: z.uuid(), consent: z.literal(true), expected_account_email: z.string().email().max(254), review_mode: z.enum(["general", "job-specific"]),
   resume_filename: z.string().trim().min(1).max(160).regex(/^[^\p{Cc}]+$/u).nullable(),
   analysis_result: savedAnalysisSchema,
   suggestions: z.array(savedSuggestionSchema).max(12),
@@ -29,7 +29,7 @@ export const savedReviewSchema = z.object({
   resume_suggestions: z.array(savedSuggestionSchema).max(12),
 }).strict();
 export type SavedReview = z.infer<typeof savedReviewSchema>;
-export const accountSchema = z.object({ ok: z.literal(true), configured: z.boolean(), historyEnabled: z.boolean(), historySetupRequired: z.boolean().optional(), user: z.object({ email: z.string().email() }).strict().nullable() }).strict();
+export const accountSchema = z.object({ ok: z.literal(true), configured: z.boolean(), historyEnabled: z.boolean(), historySetupRequired: z.boolean().optional(), historyUnavailable: z.boolean().optional(), user: z.object({ email: z.string().email() }).strict().nullable() }).strict();
 export const accountActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("sign-in"), email: z.string().trim().email().max(254), password: z.string().min(1).max(128) }).strict(),
   z.object({ action: z.literal("sign-up"), email: z.string().trim().email().max(254), password: z.string().min(12).max(128) }).strict(),
@@ -39,7 +39,7 @@ export const accountActionResponseSchema = z.object({ ok: z.literal(true), confi
 export const historyListSchema = z.object({ ok: z.literal(true), reviews: z.array(savedReviewSchema).max(20) }).strict();
 export const savedResponseSchema = z.object({ ok: z.literal(true), id: z.uuid() }).strict();
 export const deletedResponseSchema = z.object({ ok: z.literal(true) }).strict();
-export const historyErrorSchema = z.object({ ok: z.literal(false), error: z.object({ code: z.enum(["NOT_CONFIGURED", "HISTORY_DISABLED", "HISTORY_NOT_READY", "UNAUTHORIZED", "INVALID_REQUEST", "AUTH_FAILED", "BUSY", "STORAGE_ERROR", "NOT_FOUND"]), message: z.string() }).strict() }).strict();
+export const historyErrorSchema = z.object({ ok: z.literal(false), error: z.object({ code: z.enum(["NOT_CONFIGURED", "HISTORY_DISABLED", "HISTORY_NOT_READY", "UNAUTHORIZED", "ACCOUNT_CHANGED", "REVIEW_LIMIT", "INVALID_REQUEST", "AUTH_FAILED", "BUSY", "STORAGE_ERROR", "NOT_FOUND"]), message: z.string() }).strict() }).strict();
 export type HistoryErrorCode = z.infer<typeof historyErrorSchema>["error"]["code"];
 
 /** Deliberate data minimization: no documents, JD, job quotes, model metadata, or complete review JSON. */

@@ -280,6 +280,69 @@ for (const [issue, explanation] of [
   });
 }
 
+test("timeout, rate-limit and network failures preserve previews and recover only on explicit retry", async ({ page }) => {
+  let attempt = 0;
+  const requests = await mockReviews(page, { post: async (route, body) => {
+    attempt++;
+    if (attempt <= 2) await route.fulfill({ status: attempt === 1 ? 504 : 429, json: { ok: false, error: { code: attempt === 1 ? "TIMEOUT" : "RATE_LIMIT", message: "PRIVATE_ERROR_MUST_NOT_RENDER", retryable: true } } });
+    else if (attempt === 3) await route.abort("failed");
+    else await route.fulfill({ json: success(body) });
+  } });
+  await prepare(page);
+  await authorize(page);
+  const originalPreview = await resumeInput(page).inputValue();
+  const alert = page.getByRole("region", { name: "Gemini AI review", exact: true }).getByRole("alert");
+  for (const [index, message] of ["timed out", "limit has been reached", "could not be received"].entries()) {
+    await page.getByRole("button", { name: index === 0 ? "Send previews to Gemini" : "Retry Gemini review", exact: true }).click();
+    await expect(alert).toBeFocused();
+    await expect(alert).toContainText(message);
+    await expect(page.getByText("PRIVATE_ERROR_MUST_NOT_RENDER")).toHaveCount(0);
+    await expect(results(page)).toHaveCount(0);
+    await expect(resumeInput(page)).toHaveValue(originalPreview);
+    expect(requests).toHaveLength(index + 1);
+  }
+  await page.getByRole("button", { name: "Retry Gemini review", exact: true }).click();
+  await expect(results(page)).toBeVisible();
+  expect(requests).toHaveLength(4);
+  expect(new Set(requests.map(request => request.requestId)).size).toBe(4);
+});
+
+test("client review deadline aborts waiting and ignores a late response", async ({ page }) => {
+  await page.clock.install();
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const requests = await mockReviews(page, { post: async (route, body) => {
+    await held;
+    await route.fulfill({ json: success(body) }).catch(() => undefined);
+  } });
+  await prepare(page);
+  await authorize(page);
+  await send(page).click();
+  await expect.poll(() => requests.length).toBe(1);
+  await page.clock.fastForward(75_001);
+  await expect(page.getByRole("region", { name: "Gemini AI review", exact: true }).getByRole("alert")).toContainText("could not be received");
+  await expect(resumeInput(page)).toHaveValue(prepareAiText(resume));
+  release();
+  await page.unrouteAll({ behavior: "wait" });
+  await expect(results(page)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Retry Gemini review", exact: true })).toBeEnabled();
+  expect(requests).toHaveLength(1);
+});
+
+test("very long AI previews are rejected without sending or truncating them", async ({ page }) => {
+  const requests = await mockReviews(page);
+  await prepare(page);
+  await authorize(page);
+  const long = "Python database development and testing. ".repeat(800);
+  expect(long.length).toBeGreaterThan(30_000);
+  await resumeInput(page).fill(long);
+  await send(page).click();
+  await expect(resumeInput(page)).toBeFocused();
+  await expect(resumeInput(page)).toHaveValue(long);
+  await expect(page.getByRole("region", { name: "Gemini AI review", exact: true }).getByRole("alert")).toContainText("No AI request was sent");
+  expect(requests).toHaveLength(0);
+});
+
 test("validation sends nothing, malformed response is rejected, and explicit retries use new IDs", async ({ page }) => {
   let attempt = 0;
   const requests = await mockReviews(page, { post: async (route, body) => {

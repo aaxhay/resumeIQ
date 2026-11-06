@@ -4,7 +4,7 @@ import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import type { AiReview } from "@/lib/ai-review/contracts";
-import { reviewSummary, saveReviewRequestSchema, savedResponseSchema, type SaveReviewRequest } from "@/lib/saved-reviews/contracts";
+import { reviewSummary, savedAnalysisSchema, saveReviewRequestSchema, savedResponseSchema, type SaveReviewRequest } from "@/lib/saved-reviews/contracts";
 import { AccountAccess } from "./account-access";
 import { accountRequest, requestError, unauthorized } from "./api";
 import { SummaryPreview } from "./summary-preview";
@@ -33,6 +33,7 @@ function SavePanel({ review, mode }: Props) {
     return id;
   };
   const summary = reviewSummary(review);
+  const summaryFits = savedAnalysisSchema.safeParse(summary.analysis_result).success;
   return <div className="space-y-5 border-t p-4 sm:p-5" data-testid="save-review-panel">
     <div><h3 className="font-semibold">Keep a summary, not your resume</h3><p className="mt-2 text-sm leading-7 text-muted-foreground">Review and improve anonymously, or sign in here without leaving your current review or local draft. Nothing is saved automatically.</p></div>
     <AccountAccess state={account} />
@@ -45,11 +46,11 @@ function SavePanel({ review, mode }: Props) {
       <div><h3 className="font-semibold">Exact summary preview</h3><p className="mt-2 text-xs text-muted-foreground">{mode === "general" ? "General review" : "Job-specific review"} · No filename saved · Rewrite status is pending, not your editing decisions</p></div>
       <SummaryPreview analysis={summary.analysis_result} suggestions={summary.suggestions} />
     </section>
-    {account.account?.user && account.account.historyEnabled && account.account.configured ? <SaveAction key={account.account.user.email} summary={summary} mode={mode} getRequestId={() => getRequestId(account.account!.user!.email)} onUnauthorized={account.expire} /> : <p className="text-sm leading-6 text-muted-foreground">Saving requires an available history service, sign-in, and separate consent below the preview. You can continue improving your resume without saving.</p>}
+    {!summaryFits ? <Notice role="alert" tone="error">This summary exceeds the saved-history size limit and cannot be saved. Your current review and draft are unchanged. Retrying will not reduce its size; you can continue improving and export your resume without saving this summary.</Notice> : account.account?.user && account.account.historyEnabled && account.account.configured ? <SaveAction key={account.account.user.email} summary={summary} mode={mode} expectedEmail={account.account.user.email} getRequestId={() => getRequestId(account.account!.user!.email)} onUnauthorized={account.expire} /> : <p className="text-sm leading-6 text-muted-foreground">Saving requires an available history service, sign-in, and separate consent below the preview. You can continue improving your resume without saving.</p>}
   </div>;
 }
 
-function SaveAction({ summary, mode, getRequestId, onUnauthorized }: { summary: Pick<SaveReviewRequest, "analysis_result" | "suggestions">; mode: Props["mode"]; getRequestId: () => string; onUnauthorized: () => void }) {
+function SaveAction({ summary, mode, expectedEmail, getRequestId, onUnauthorized }: { summary: Pick<SaveReviewRequest, "analysis_result" | "suggestions">; mode: Props["mode"]; expectedEmail: string; getRequestId: () => string; onUnauthorized: (message?: string) => void }) {
   const [consent, setConsent] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -61,13 +62,13 @@ function SaveAction({ summary, mode, getRequestId, onUnauthorized }: { summary: 
     if (!controller) return;
     setError("");
     try {
-      const payload = saveReviewRequestSchema.parse({ ...summary, id: getRequestId(), consent: true, review_mode: mode, resume_filename: null });
+      const payload = saveReviewRequestSchema.parse({ ...summary, id: getRequestId(), consent: true, expected_account_email: expectedEmail, review_mode: mode, resume_filename: null });
       const result = await accountRequest("/api/review-history", savedResponseSchema, controller.signal, "POST", payload);
       if (result.id !== payload.id) throw new Error("Unconfirmed save");
       if (request.current(controller)) setSaved(true);
     } catch (failure) {
       if (request.current(controller)) {
-        if (unauthorized(failure)) onUnauthorized();
+        if (unauthorized(failure)) onUnauthorized(requestError(failure));
         else setError(requestError(failure));
       }
     } finally { request.finish(controller); }

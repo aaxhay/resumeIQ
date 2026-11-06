@@ -27,8 +27,8 @@ Implemented on 2026-11-06. This milestone stops at **confirmed editable text**. 
 
 | Boundary | Limit |
 | --- | --- |
-| File bytes | 5 MiB (UI label: 5 MB) |
-| Multipart body | 5 MiB + 64 KiB framing allowance |
+| File bytes | 4 MiB (UI label: 4 MB) |
+| Multipart body | 4 MiB + 64 KiB framing allowance; below Vercel's 4.5 MB ceiling |
 | JSON body | 80,000 × 6 + 1,024 bytes (allows JSON escaping) |
 | Read deadline | 15 seconds |
 | Parser deadline | 15 seconds, terminated process |
@@ -46,7 +46,9 @@ PDF processing disables evaluation and worker fetching, checks the end marker, e
 
 DOCX processing validates ZIP local/central headers, names, duplicates, encryption, macros, streamed size/CRC, OOXML required parts, content types, relationships, XML syntax, and namespace/body structure. It rejects DTD/entity declarations. Mammoth runs with external file access and embedded style maps disabled. Converter HTML is consumed as data by a server-side plain-text converter; it is never sent to the browser or rendered. Paragraphs, headings, list markers, and table-cell separation are retained where possible.
 
-Normalization preserves line/paragraph boundaries and ordinary hyphenated lines while normalizing whitespace, controls, and common ligatures. It does not promise exact layout reconstruction.
+QA corrections (2026-11-07): DOCX archives with nonblank Word text in header/footer parts fail with `UNSUPPORTED_FORMAT` and guidance to move text into the body or paste the complete resume. This is a conservative rejection, including unused parts, not implemented header/footer extraction. Blank header/footer parts remain supported. Hyperlinks retain only visible text; a bounded static `partial` warning asks users to copy needed contact/profile destinations into visible text before confirmation/export. Destination values are never fetched, appended, logged, or rendered. Bookmark-only links do not trigger that warning.
+
+Normalization preserves line/paragraph boundaries and ordinary hyphenated lines while normalizing whitespace, controls, and common ligatures. It does not promise exact layout reconstruction. Upload aborts immediately cancel the body reader even when no further chunk arrives; tests distinguish abort, read deadline, and network interruption.
 
 ## Process lifecycle and privacy
 
@@ -56,7 +58,7 @@ A separate process and heap cap are **not a complete security sandbox or a total
 
 ## Runtime/deployment requirements
 
-Use a full-project Node 24 deployment: retain `src/server/resume-processing`, `src/lib/resume`, `package.json`, and runtime `node_modules` alongside the Next build, with the project root as the working directory. The worker executes owned `.ts` source outside the Next bundle. Do not deploy only `.next` or assume a standalone/serverless artifact includes the worker and parser dependencies. Standalone, Edge, serverless, and Linux deployment packaging have not been verified. Build dependencies are needed at build time; `docx` and `pdf-lib` are development-only synthetic fixture tools, not export functionality.
+Use a full-project Node 24 deployment: retain `src/server/resume-processing`, `src/lib/resume`, `package.json`, and runtime `node_modules` alongside the Next build, with the project root as the working directory. The worker executes owned `.ts` source outside the Next bundle. Do not deploy only `.next` or assume a standalone/serverless artifact includes the worker and parser dependencies. The Vercel demo configuration now explicitly traces worker source and its installed runtime dependency closure using `scripts/deployment-tracing.ts`; absent required dependencies fail configuration, and installed platform-native optional packages/assets are included. This is packaging preparation, not hosted verification. Edge is unsupported. See [deployment checks](deployment.md) for the current serverless/Linux verification status. Build dependencies are needed at build time. `pdf-lib` is a development-only synthetic fixture tool; the later DOCX-export milestone promoted `docx` to a runtime dependency for server-generated downloads.
 
 Unsupported: OCR, legacy `.doc`, password-protected documents, exact column/table layout, uncommon OOXML encodings/packaging, and documents beyond the limits. Offer fresh exports or pasted text rather than pretending extraction succeeded. Final edited text must be validated again on the server when a future analysis endpoint is added; client confirmation is not an authorization boundary.
 

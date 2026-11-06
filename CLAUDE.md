@@ -57,7 +57,7 @@ Run production and development E2E sequentially (ports 3100 and 3101 respectivel
 
 Import direction: UI/route → focused application logic → server adapter. Server adapters may depend on shared contracts, never the reverse. Use `import "server-only"` in secret-bearing, AI, persistence, and document modules. Use Node runtime, not Edge, for document handlers. Do not add generic repositories, provider factories, or a global state library before there is a demonstrated need.
 
-See `docs/design-system.md` for visual conventions and `docs/extraction.md` for the current workflow, limits, verification, and deployment constraints. File input is limited to 5 MiB; PDF to 20 pages; text to 80,000 characters. Browser screening is never the server security boundary. Server parsing has bounded ZIP expansion, a 15-second kill deadline, and local concurrency/heap caps; OS/container limits and distributed rate limits remain release requirements.
+See `docs/design-system.md` for visual conventions and `docs/extraction.md` for the current workflow, limits, verification, and deployment constraints. File input is limited to 4 MiB; PDF to 20 pages; text to 80,000 characters. Browser screening is never the server security boundary. Server parsing has bounded ZIP expansion, a 15-second kill deadline, and local concurrency/heap caps; OS/container limits and distributed rate limits remain release requirements.
 
 ## Engineering rules
 

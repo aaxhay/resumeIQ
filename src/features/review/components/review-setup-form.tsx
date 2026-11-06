@@ -120,10 +120,10 @@ export function ReviewSetupForm() {
       <Card>
         <form noValidate onSubmit={submit} aria-label="Resume review setup">
           <fieldset disabled={setup.processing} className="min-w-0 space-y-8 disabled:opacity-70">
-            <fieldset className="flex flex-wrap gap-5">
-              <legend className="mb-3 text-sm font-medium">Resume input</legend>
-              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm"><input type="radio" name="resume-source" value="file" checked={setup.source === "file"} onChange={() => setup.changeSource("file")} className="size-4 accent-primary" /> Upload a file</label>
-              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm"><input type="radio" name="resume-source" value="paste" checked={setup.source === "paste"} onChange={() => setup.changeSource("paste")} className="size-4 accent-primary" /> Paste resume text</label>
+            <fieldset className="flex flex-wrap gap-3">
+              <legend className="mb-3 text-sm font-semibold">Resume input</legend>
+              <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border bg-background px-4 py-2.5 text-sm font-medium transition-colors hover:border-primary/50 has-checked:border-primary/40 has-checked:bg-accent/60 has-checked:text-primary"><input type="radio" name="resume-source" value="file" checked={setup.source === "file"} onChange={() => setup.changeSource("file")} className="size-4 accent-primary" /> Upload a file</label>
+              <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border bg-background px-4 py-2.5 text-sm font-medium transition-colors hover:border-primary/50 has-checked:border-primary/40 has-checked:bg-accent/60 has-checked:text-primary"><input type="radio" name="resume-source" value="paste" checked={setup.source === "paste"} onChange={() => setup.changeSource("paste")} className="size-4 accent-primary" /> Paste resume text</label>
             </fieldset>
             {setup.source === "file" ? <ResumeUpload file={setup.fileState.file} checking={checking} error={setup.fileState.error} inputRef={fileInput} onSelect={setup.selectFiles} onRemove={setup.removeFile} /> : <div>
               <label htmlFor="pasted-resume" className="text-lg font-semibold">1. Paste your resume text</label>
