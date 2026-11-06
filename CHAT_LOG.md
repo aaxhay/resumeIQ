@@ -39,6 +39,10 @@ No AI feedback is shown. Check the previews, then use Retry Gemini review to mak
 
 24. **Evaluator TypeScript error report (summary; 2026-11-07).** Reported TS2307 for the old `../src/server/ai/grounding.ts` import in `scripts/ai-evaluation.ts`, followed by TS7006 implicit-parameter-type errors for `field`, `reason`, and `technology`. Subsequently clarified that these occur during deployment: `Failed to type check` and `[BUILD_UTILS_SPAWN_1] Command "npm run build" exited with 1`.
 
+25. **Deployed extraction error (verbatim; 2026-11-07).** “after deployment when i was trying to upload pdf and extract resume text it was saying --> Submit your resume from this application.” Subsequently reported that this error was solved; no hosted verification was supplied.
+
+26. **Gemini duplicate-request error (summary; 2026-11-07).** After reporting the extraction error resolved, reported Gemini review showing “This request has already been submitted. No new review was started. Wait before retrying.” followed by the no-feedback and explicit-retry guidance. Investigate the duplicate guard and retry flow without weakening protections or claiming that an underlying provider failure is established by this message.
+
 ## Standing implementation requirements
 
 - Strict TypeScript; no `any`; validate external inputs and use typed contracts.

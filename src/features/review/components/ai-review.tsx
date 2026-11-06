@@ -20,7 +20,7 @@ const ERROR_MESSAGES: Record<Extract<Response, { ok: false }>["error"]["code"], 
   NOT_CONFIGURED: "Gemini review is not configured. Local text checks are still available.",
   PRIVACY_GATE: "The server privacy gate rejected this request. Only synthetic, non-confidential documents may be allowed.",
   BUSY: "Gemini review is busy. Wait a moment before retrying.",
-  DUPLICATE: "This request has already been submitted. No new review was started. Wait before retrying.",
+  DUPLICATE: "An identical review is still running or was submitted recently. This attempt did not start another review. Wait for the retry countdown; an earlier attempt may have failed or been cancelled.",
   RATE_LIMIT: "The review limit has been reached. Wait before retrying.",
   TIMEOUT: "Gemini review timed out. A provider charge may still apply. You can retry explicitly.",
   CANCELLED: "The review was cancelled. A provider charge may still apply.",
@@ -49,6 +49,8 @@ export function AiReview({ text, jobDescription, mode, onImprove }: { text: stri
   const [availabilityError, setAvailabilityError] = useState(false);
   const [availabilityAttempt, setAvailabilityAttempt] = useState(0);
   const [pending, setPending] = useState(false);
+  const [retrySeconds, setRetrySeconds] = useState(0);
+  const retryAvailableAt = useRef(0);
   const [error, setError] = useState<string>();
   const [status, setStatus] = useState("");
   const [result, setResult] = useState<Success>();
@@ -88,6 +90,15 @@ export function AiReview({ text, jobDescription, mode, onImprove }: { text: stri
     if (!pending && focusAfterCancel.current) { focusAfterCancel.current = false; action.current?.focus(); }
   }, [pending]);
 
+  useEffect(() => {
+    if (retrySeconds === 0) return;
+    // Use a deadline rather than decrementing: background tabs may delay timers.
+    const timer = window.setTimeout(() => {
+      setRetrySeconds(Math.max(0, Math.ceil((retryAvailableAt.current - Date.now()) / 1000)));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [retrySeconds]);
+
   function invalidate() {
     const wasPending = Boolean(request.current);
     request.current?.abort();
@@ -100,7 +111,7 @@ export function AiReview({ text, jobDescription, mode, onImprove }: { text: stri
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (request.current || result || !availability?.configured || !consent || (!availability.personalDataEnabled && !synthetic)) return;
+    if (request.current || retryAvailableAt.current > Date.now() || result || !availability?.configured || !consent || (!availability.personalDataEnabled && !synthetic)) return;
     invalidInput.current = null;
     const parsed = reviewRequestSchema.safeParse({ mode, resumeText: resumePreview, ...(mode === "job-specific" ? { jobDescription: jobPreview } : {}), confirmed: true, consent: true, synthetic, requestId: crypto.randomUUID() });
     if (!parsed.success) {
@@ -123,6 +134,14 @@ export function AiReview({ text, jobDescription, mode, onImprove }: { text: stri
         setError("The response could not be validated because it did not match this page’s response contract. Your previews are preserved. If the app was updated while this page was open, save your edits locally before refreshing. (Reason: response_contract)");
       } else if (!payload.data.ok) {
         const failure = payload.data.error;
+        // Our API emits bounded delta-seconds, never an HTTP date. Do not render
+        // arbitrary header values, and retain a safe fallback for older deployments.
+        const retryAfter = response.headers.get("retry-after");
+        const parsedDelay = retryAfter !== null && /^\d{1,5}$/u.test(retryAfter) ? Number(retryAfter) : 0;
+        const fallbackDelay = failure.code === "DUPLICATE" || retryAfter !== null ? 60 : 0;
+        const delay = parsedDelay > 0 && parsedDelay <= 86_400 ? parsedDelay : fallbackDelay;
+        retryAvailableAt.current = Date.now() + delay * 1000;
+        setRetrySeconds(delay);
         setError(failure.code === "INVALID_RESPONSE" && failure.validationIssue
           ? `The response could not be validated. ${VALIDATION_MESSAGES[failure.validationIssue]} (Reason: ${failure.validationIssue})`
           : ERROR_MESSAGES[failure.code]);
@@ -160,13 +179,14 @@ export function AiReview({ text, jobDescription, mode, onImprove }: { text: stri
         <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm leading-6"><input type="checkbox" className="mt-1 size-4 shrink-0 accent-primary" checked={synthetic} onChange={(event) => { invalidate(); setSynthetic(event.target.checked); }} /><span>These documents are synthetic and contain no real personal or confidential information.{!availability?.personalDataEnabled && " Required for this deployment."}</span></label>
         <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm leading-6"><input type="checkbox" className="mt-1 size-4 shrink-0 accent-primary" checked={consent} onChange={(event) => { invalidate(); setConsent(event.target.checked); }} /><span>I consent to transferring these previews to Google for Gemini processing. I am 18 or older and am using the service from a supported region under the Google terms.</span></label>
         <p id="ai-action-help" className="text-xs leading-6 text-muted-foreground">Review and minimize the previews, then give explicit consent{!availability?.personalDataEnabled ? " and confirm synthetic-only content" : ""}. The server may make one additional validation-correction call within the same deadline; both calls may be billed. Network failures are not automatically retried. Cancellation stops waiting in this browser; the server may still complete the request and bill for it.</p>
-        <div className="flex flex-wrap gap-3"><Button ref={action} type="submit" className="w-full sm:w-auto" aria-describedby="ai-action-help" disabled={!availability?.configured || availabilityError || !consent || (!availability.personalDataEnabled && !synthetic) || pending || Boolean(result)}>{pending ? "Requesting Gemini review…" : error ? "Retry Gemini review" : "Send previews to Gemini"}</Button>
+        <div className="flex flex-wrap gap-3"><Button ref={action} type="submit" className="w-full sm:w-auto" aria-describedby={`ai-action-help${retrySeconds > 0 ? " ai-retry-wait" : ""}`} disabled={!availability?.configured || availabilityError || !consent || (!availability.personalDataEnabled && !synthetic) || pending || retrySeconds > 0 || Boolean(result)}>{pending ? "Requesting Gemini review…" : error ? "Retry Gemini review" : "Send previews to Gemini"}</Button>
           {pending && <Button type="button" variant="outline" onClick={() => { focusAfterCancel.current = true; invalidate(); setStatus("Request cancelled in this browser. The server may still complete the request and bill for it."); }}>Cancel Gemini review</Button>}
         </div>
+        {retrySeconds > 0 && <p id="ai-retry-wait" className="text-sm leading-6 text-muted-foreground">You can retry in {retrySeconds} seconds. No retry is sent automatically.</p>}
       </form>
       <p role="status" className="text-sm leading-6 text-muted-foreground">{result ? "Gemini feedback is ready. Inspect the evidence and limitations below." : status}</p>
       {pending && <ResultsSkeleton />}
-      {error && <Notice id="ai-review-error" ref={errorPanel} tabIndex={-1} role="alert" tone="error"><p>{error}</p><p className="mt-2">No AI feedback is shown. Check the previews, then use Retry Gemini review to make a new request. Local checks remain available.</p></Notice>}
+      {error && <Notice id="ai-review-error" ref={errorPanel} tabIndex={-1} role="alert" tone="error"><p>{error}</p><p className="mt-2">{retrySeconds > 0 ? "No AI feedback is shown. Wait for the countdown before explicitly retrying. Local checks remain available." : "No AI feedback is shown. Check the previews, then use Retry Gemini review to make a new request. Local checks remain available."}</p></Notice>}
       {result && <div ref={resultsPanel} tabIndex={-1} aria-labelledby="ai-results-title" data-testid="ai-review-results" className="min-w-0 space-y-5 rounded-sm border-t pt-5">
         <div><h3 id="ai-results-title" className="text-lg font-semibold">Gemini review complete</h3><p className="mt-2 text-xs [overflow-wrap:anywhere]">Response model: {result.model}</p></div>
         <Notice>Exact citations are checked against the submitted text, but semantic claims may still be wrong. This is not factual verification, an ATS score, or a hiring guarantee. Verify every suggestion. {result.redacted && "Additional best-effort redaction was applied by the server; some citations may contain redaction placeholders."} Evidence refers to the sent previews, not the original editor.</Notice>

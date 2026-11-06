@@ -33,6 +33,23 @@ An AI-powered resume review tool. Users upload a resume, get AI-generated insigh
 5. **Review**: the user accepts, rejects, or edits each suggestion.
 6. **Export**: the final resume is exported as a DOCX file.
 
+## Development Phases
+
+The project is built in ten phases. Each phase builds on the one before it, so the core workflow (upload, analyze, improve, export) works before any optional integrations are added.
+
+| Phase | Focus | What it covers |
+|---|---|---|
+| **Phase 0** | Project initialization and engineering rules | Project setup, strict TypeScript, linting, and the coding and safety rules the project follows throughout |
+| **Phase 1** | Design and application foundation | App structure, shared UI components, landing page, and the light/dark theme with toggle |
+| **Phase 2** | Resume upload and document extraction | PDF/DOCX upload and pasted text, text extraction, and a step where the user checks and confirms the extracted text |
+| **Phase 3** | Build the deterministic analysis engine | Local, rule-based resume checks that run without an API key or any AI call |
+| **Phase 4** | AI integration and evidence-backed analysis | Gemini API integration, consent before sending data, and validation of AI output so suggestions are backed by evidence from the resume |
+| **Phase 5** | Job description intelligence and feedback dashboard | Job-specific review that compares the resume to a job description, and a dashboard showing feedback and supporting evidence |
+| **Phase 6** | Interactive resume improvement | Accept, reject, or manually edit each suggestion in a separate draft, with undo and restore-original |
+| **Phase 7** | DOCX export | Generating a clean, editable DOCX containing only the accepted edits, and checking it by re-reading the generated file |
+| **Phase 8** | Supabase integration | Optional accounts and saved review history. **Only started if the core workflow is already working.** |
+| **Phase 9** | Complete testing, security review, and bug fixing | Unit, integration, and browser tests, a security and privacy review, and fixing the issues they uncover |
+
 ## AI Insights (Gemini API)
 
 - Insights are generated using the Gemini API with an API key.

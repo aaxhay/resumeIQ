@@ -4,7 +4,7 @@ import { reviewRequestSchema, reviewResponseSchema } from "@/lib/ai-review/contr
 import { analyzeJobDescription } from "@/server/ai/job-analysis";
 import { createGeminiProvider } from "@/server/ai/gemini";
 import { readReviewRequest } from "@/server/ai/request";
-import { acquireReview } from "@/server/ai/guard";
+import { acquireReview, REVIEW_COOLDOWN_SECONDS } from "@/server/ai/guard";
 import { AiError, safeAiFailure } from "@/server/ai/errors";
 import { validateReview } from "@/server/ai/validate";
 
@@ -37,6 +37,9 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json(response, { headers });
   } catch (error) {
     const failure = safeAiFailure(error);
-    return Response.json(failure.body, { status: failure.status, headers: { ...headers, ...(failure.status === 429 || failure.status === 409 ? { "Retry-After": "60" } : {}) } });
+    // Admitted requests enter the input cooldown in finally, including provider
+    // and validation failures. Tell the browser before it offers another attempt.
+    const retryAfter = failure.status === 429 || failure.status === 409 ? 60 : release ? REVIEW_COOLDOWN_SECONDS : undefined;
+    return Response.json(failure.body, { status: failure.status, headers: { ...headers, ...(retryAfter === undefined ? {} : { "Retry-After": String(retryAfter) }) } });
   } finally { release?.(); }
 }

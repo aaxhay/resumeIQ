@@ -67,6 +67,14 @@ The user's original generic message alone does not establish which condition occ
 - Local process limits: two concurrent calls, ten admissions per rolling-start minute, one hundred submissions per rolling-start day (up to two provider calls each), five-minute request-ID replay suppression, same-input concurrent suppression and thirty-second post-completion cooldown. Only hashes/timestamps are stored. Rejected admissions do not spend provider quota.
 - These caps reset with the process and are not distributed limits, authentication, or hard monetary budgets. **Do not expose the endpoint publicly** until trusted ingress, distributed per-user/global limits, provider spending budgets, production cancellation/resource behavior, and privacy/access controls are verified.
 
+## Duplicate-request retry recovery (2026-11-07)
+
+`DUPLICATE` is an application admission rejection, not a Gemini response and not proof that a previous review succeeded. Identical minimized previews are blocked while active and for thirty seconds after completion, including failure/cancellation; replaying an admitted request ID is blocked for five minutes. A new explicit browser attempt already generates a fresh UUID, but that alone does not bypass the input cooldown. These process-local protections remain unchanged.
+
+Reproduced reliability defect: failed admitted requests did not advertise their thirty-second cooldown, and the browser ignored `Retry-After` on duplicate responses, immediately enabling another retry. The API now includes the cooldown header on admitted failures. The UI honors bounded delta-seconds, displays a countdown, and blocks both button and form submissions until it expires. Missing/malformed duplicate headers use a sixty-second fallback. Expiry never starts a request automatically; a deliberate retry retains previews and uses a new UUID. Preview/consent changes do not clear an active countdown. A wait is an earliest retry opportunity, not a guarantee that quota or an active request has cleared.
+
+Focused verification: the new API and browser regressions failed before the repair (missing header and incorrectly enabled Retry). After repair, 70 guard/route tests, strict types, zero-warning lint, and eight development desktop/mobile countdown regressions passed. Browser tests use synthetic documents, real text preparation, and a mocked review API; they do not establish live Gemini or hosted success. The user's original provider outcome and hosted request sequence remain unknown; this repair fixes retry handling, not an unobserved upstream cause.
+
 ## Job-specific claim recovery (2026-11-06)
 
 A synthetic composite job description reproduced the reported `unsupported_claim` rejection with the configured Gemini provider. The internal failure was `unsupported-requirement-claim`: a `supported` label failed the existing literal full-requirement evidence check. This reproduces the failure class, not the user's private document pair.
