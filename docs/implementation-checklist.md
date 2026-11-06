@@ -64,18 +64,23 @@ Dependencies: normalized text; no provider credentials. See `deterministic-analy
 - [x] Drive the live development app at 1280px, 390px, and 320px; verify evidence selection/invalidation, no page errors/overflow, and inspect screenshots.
 - [x] Document API, thresholds, privacy, verification, and limitations; no new dependencies or provider calls.
 
-## Phase 2 — AI analysis and feedback (next)
+## Current — Gemini AI analysis and feedback
 
-Dependencies: confirmed text; Gemini key, chosen model, quota/billing; consent copy.
+Dependencies: confirmed text, configured key/model, explicit minimized-preview consent. Synthetic-only until operator-reviewed paid-service/privacy setup. See `ai-integration.md`.
 
-- [ ] Install maintained `@google/genai`; validate server-only configuration lazily.
-- [ ] Define discriminated general/job-specific request schemas and bounded structured response schema.
-- [ ] Implement server-only Gemini request with consent, timeout, bounded retries, and output validation.
-- [ ] Treat supplied documents as untrusted data and prohibit invented facts.
-- [ ] Add public-endpoint rate limits, request bounds, duplicate-submit protection, and budget controls.
-- [ ] Render prioritized feedback, source evidence, and honest limitations; no fabricated ATS scores.
-- [ ] Test absent config, invalid input/output, throttling, provider errors, and timeouts using mocks.
-- [ ] Run a separately authorized live-provider smoke test with synthetic data.
+- [x] Verify current official SDK, structured output, models, errors/rate limits and terms; pin `@google/genai@3.0.0`.
+- [x] Verify authenticated model listing and actual structured generation; select `gemini-3.5-flash-lite` explicitly.
+- [x] Implement provider-independent general/job/bullet interfaces; isolate SDK and credentials server-side.
+- [x] Define strict general/job requests and bounded response contracts; validate exact evidence, coverage, statuses, rewrites and numeric claims.
+- [x] Enforce confirmed input, explicit consent, synthetic-only policy, editable minimized previews and safe missing-config behavior.
+- [x] Treat documents as untrusted data; no tools, secrets or privileged actions exposed to the model.
+- [x] Add bounded request reading, origin checks, deadlines, cancellation, local concurrency/usage caps, duplicate suppression and one bounded validation correction.
+- [ ] Add distributed/authenticated public-endpoint limits and provider monetary budget controls before public deployment; local caps are not a substitute.
+- [x] Render assessment, three priorities, strengths, coverage, exact evidence, recommendations, optional unapplied extractive rewrites and four job-evidence statuses; no scores.
+- [x] Test invalid output/evidence, fabricated metrics, unsupported skills, missing config, timeout/rate limits, input bounds, document injection, consent and stale responses with mocked provider boundaries.
+- [x] Run actual Gemini general/job/injection checks using only synthetic fixtures.
+- [x] Drive actual desktop general and mobile job-specific browser flows through Gemini with no API mocking; inspect screenshots and verify stale results clear.
+- [ ] Verify real-user paid-service/privacy and public deployment configuration separately; not enabled by this milestone.
 
 ## Phase 3 — Improvements and export (day 2, first)
 

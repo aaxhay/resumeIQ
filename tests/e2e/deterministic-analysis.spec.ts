@@ -59,7 +59,7 @@ test("invalidates findings on text and mode changes, requiring confirmation agai
   await job.fill("A fictional role requiring clear writing, testing, accessibility, and collaborative development.");
   await page.getByRole("button", { name: "Confirm resume text" }).click();
   await run(page).click();
-  await expect(page.getByText(/job-description matching and AI review are not implemented/)).toBeVisible();
+  await expect(page.getByText(/these local checks do not compare job descriptions/)).toBeVisible();
   await expect(page.getByText(/No findings from these limited rules/)).toBeVisible();
   await job.fill("Another fictional role requiring clear writing and reliable software development and documentation.");
   await expect(page.getByTestId("text-check-results")).toHaveCount(0);

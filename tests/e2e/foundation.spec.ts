@@ -10,7 +10,7 @@ test("landing page is honest, responsive, and navigates to setup", async ({ page
   await expect(page.getByRole("heading", { level: 1 })).toContainText("stronger resume");
   await expect(page.getByRole("heading", { name: "General Review", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Job-Specific Review", exact: true })).toBeVisible();
-  await expect(page.getByText(/AI feedback and export are not available yet/)).toBeVisible();
+  await expect(page.getByText(/Gemini feedback is optional, requires consent, and is synthetic-only by default/)).toBeVisible();
   await page.getByRole("link", { name: "See how it works" }).click();
   await expect(page).toHaveURL(/#how-it-works$/);
   await page.getByRole("link", { name: "Review My Resume" }).click();

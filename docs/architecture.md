@@ -2,7 +2,7 @@
 
 ## One application, explicit boundaries
 
-Next.js App Router + strict TypeScript, Tailwind, and shadcn/ui. The session-only MVP needs no database. The current milestone implements upload → mode selection → extraction → editable text confirmation → explicit deterministic text checks. AI review, job-description matching, generated improvements, and export remain future work.
+Next.js App Router + strict TypeScript, Tailwind, and shadcn/ui. The session-only MVP needs no database. The current milestone implements upload → mode selection → extraction → editable text confirmation → explicit deterministic text checks. Optional consent-based Gemini review adds general feedback and job-description evidence comparison. Extractive shortening suggestions are not applied automatically. Full generative editing and export remain future work.
 
 ```text
 src/app/                         Server pages and thin Node route handlers
@@ -13,7 +13,8 @@ src/lib/resume-analysis/         Pure deterministic rules, findings, evidence, p
 src/lib/config/                  Pure environment validator
 src/server/resume-processing/    Bounded requests, validation, isolated parsers, normalization
 src/server/config/               Lazy server-only configuration
-src/server/ai/                   Reserved Gemini adapter
+src/lib/ai-review/               Shared strict schemas and contact minimization
+src/server/ai/                   Gemini adapter, provider interface, evidence validation, guards
 src/server/documents/            Reserved DOCX export
 src/server/data/                 Reserved optional persistence
 ```
@@ -39,17 +40,18 @@ The analyzer imports only browser-safe contracts/helpers and Zod; it can also ru
 | Route | Status | Input/output |
 | --- | --- | --- |
 | `POST /api/resume/extract` | Implemented | One PDF/DOCX or `{text}` → text/warnings/stats or typed error |
-| `POST /api/reviews` | Planned | Validated confirmed text, consent, general/job-specific mode → structured review |
+| `GET /api/reviews` | Implemented | Configuration-presence and operator privacy-policy booleans only |
+| `POST /api/reviews` | Implemented | Confirmed minimized previews, consent, general/job mode → validated feedback or safe error |
 | `POST /api/resume/export` | Planned | User-approved structured resume → DOCX |
 
 The analysis endpoint must repeat text, mode, and job-description validation and require consent. A browser confirmation flag is not proof of trusted content. Gemini must receive supplied documents as untrusted data, never instructions. Validate model output; do not fabricate achievements or ATS guarantees. Invalidate analysis when text/preferences change, and export when approved content changes.
 
 ## Session and privacy
 
-Resume bytes/text are processed in server memory; edits, confirmation and job description stay in browser page memory. No localStorage, account, database, or document file storage. Start over or reload clears the page; process exit releases the parser address space, not a guarantee of secure erasure. No document/prompt/provider payload logging. No AI requests exist yet. Future provider processing requires separate consent and verified data-handling terms.
+Resume bytes/text are processed in server memory. Edits/JD stay browser-local until the optional AI action sends reviewed minimized previews to the server and Google. Explicit consent and synthetic-only/paid-reviewed operator policy are checked server-side. No localStorage, account, database, document files, or stored provider output. Hashes/timestamps provide short-lived local duplicate controls; no raw documents are cached. Start over/reload clears the page; process exit is not secure erasure. No document/prompt/provider payload logging. Google has separate retention/security/abuse terms; do not promise zero provider retention. See `ai-integration.md`.
 
 Supabase remains deferred until an actual history/account requirement justifies Auth, private Storage, RLS, retention, and ownership tests.
 
 ## Release constraints
 
-Local Node 24 full-project execution is the supported path. Keep worker sources/shared modules and runtime dependencies available; do not assume standalone/serverless tracing packages them. No host is selected or tested. A V8 heap limit is not a native-memory/RSS limit, and child processes are not security sandboxes. Public release requires OS/container limits, upload/body/deadline settings, distributed abuse/rate controls, and deployment-specific verification. Provider credentials, model selection, quotas, and cost controls are still prerequisites for future AI analysis, not for the implemented local deterministic checks.
+Local Node 24 full-project execution is the supported path. Keep worker sources/shared modules and runtime dependencies available; do not assume standalone/serverless tracing packages them. No host is selected or tested. A V8 heap limit is not a native-memory/RSS limit, and child processes are not security sandboxes. Public release requires OS/container limits, upload/body/deadline settings, distributed abuse/rate controls, and deployment-specific verification. Gemini is configured locally for synthetic verification, with bounded process-local controls; distributed per-user limits, provider budget controls, paid-service/privacy review, and production access restrictions remain public-release gates. Only the adapter imports SDK types. Generation JSON is validated by full Zod schemas and exact evidence checks before any UI result; malformed feedback is never silently displayed.

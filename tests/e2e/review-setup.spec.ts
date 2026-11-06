@@ -42,7 +42,7 @@ for (const kind of ["pdf", "docx"] as const) {
     await page.getByRole("button", { name: "Confirm resume text" }).click();
     await expect(ready(page)).toBeVisible();
     await expect(editor).toHaveValue(edited);
-    await expect(page.getByText(/No AI analysis is performed/)).toBeVisible();
+    await expect(page.getByText(/Confirmation does not run AI analysis/)).toBeVisible();
     expect(requests).toHaveLength(1);
     expect(requests[0]).toContain("/api/resume/extract");
     await page.screenshot({ path: testInfo.outputPath(`${kind}-confirmation.png`), fullPage: true });

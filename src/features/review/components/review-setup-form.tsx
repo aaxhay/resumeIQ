@@ -12,6 +12,7 @@ import { ResumeUpload } from "./resume-upload";
 import { ReviewModeSelect } from "./review-mode-select";
 import { SetupConfirmation } from "./setup-confirmation";
 import { DeterministicReview } from "./deterministic-review";
+import { AiReview } from "./ai-review";
 
 export function ReviewSetupForm() {
   const setup = useReviewSetup();
@@ -70,7 +71,7 @@ export function ReviewSetupForm() {
             {setup.mode === "job-specific" && <JobDescriptionField value={setup.jobDescription} error={setup.jobError} inputRef={jobInput} onChange={setup.changeJobDescription} onBlur={setup.touchJobDescription} />}
           </fieldset>
           <div className="mt-8 border-t pt-6">
-            <p id="setup-action-help" className="mb-4 text-xs leading-6 text-muted-foreground">Extraction sends your file or pasted text to this application’s server. It is processed in memory, not saved by the application or sent to an AI provider. Your job description stays in this browser.</p>
+            <p id="setup-action-help" className="mb-4 text-xs leading-6 text-muted-foreground">Extraction sends your file or pasted text to this application’s server. It is processed in memory, not saved by the application or sent to an AI provider. Your job description stays in this browser during extraction. Optional Gemini review below has a separate preview and consent step.</p>
             <div className="flex flex-wrap items-center gap-3">
               <Button type="submit" disabled={Boolean(setup.extraction) || setup.processing || checking || (setup.source === "file" ? !setup.fileState.file : !setup.pastedText.trim())} aria-describedby="setup-action-help" className="w-full sm:w-auto">
                 {setup.processing ? <><LoaderCircle aria-hidden="true" className="animate-spin motion-reduce:animate-none" /> Processing resume…</> : <>{setup.source === "file" ? "Extract resume text" : "Prepare pasted text"}<ArrowRight aria-hidden="true" /></>}
@@ -102,6 +103,7 @@ export function ReviewSetupForm() {
         editor.current?.setSelectionRange(start, end);
         editor.current?.scrollIntoView({ block: "center" });
       }} />}
+      {setup.confirmed && <AiReview text={setup.editedText} jobDescription={setup.jobDescription} mode={setup.mode} />}
     </div>
   );
 }

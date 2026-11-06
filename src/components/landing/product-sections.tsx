@@ -31,11 +31,11 @@ export function HowItWorks() {
       <div className="page-container">
         <p className="eyebrow mb-3">Simple by design</p>
         <h2 id="how-title" className="section-title">A clear path from draft to ready.</h2>
-        <p className="mt-4 max-w-2xl leading-7 text-muted-foreground">The first step is available to try. Here’s where we’re heading next.</p>
+        <p className="mt-4 max-w-2xl leading-7 text-muted-foreground">Start with extraction and local text checks. Optional Gemini feedback requires configuration and consent; export is planned.</p>
         <ol className="mt-10 grid gap-8 md:grid-cols-3">
           {[
             { title: "Add your resume", description: "Upload a PDF or DOCX, or paste your text. Choose a review mode, then inspect, edit, and confirm the extracted text.", stage: "Available now", Icon: FileCheck2 },
-            { title: "Find your opportunities", description: "Confirm extracted text, then get prioritized AI feedback on what to improve.", stage: "Coming next", Icon: ScanText },
+            { title: "Find your opportunities", description: "Run local text checks, or review minimized previews and explicitly consent to Gemini feedback. Synthetic-only by default.", stage: "Gemini when configured", Icon: ScanText },
             { title: "Make it your own", description: "Review suggestions, refine your wording, and export your approved resume as DOCX.", stage: "Planned", Icon: PencilLine },
           ].map(({ title, description, stage, Icon }, index) => (
             <li key={title} className="border-t pt-5">
@@ -54,10 +54,10 @@ export function PrivacySection() {
   return (
     <section id="privacy" className="page-container py-16 sm:py-20" aria-labelledby="privacy-title">
       <div className="grid gap-8 rounded-2xl bg-[#173e35] p-7 text-white sm:p-10 md:grid-cols-[1.2fr_1fr] md:gap-16">
-        <div><ShieldCheck aria-hidden="true" className="mb-5 size-7 text-emerald-200" /><h2 id="privacy-title" className="text-3xl leading-tight font-semibold tracking-tight">Clear about your privacy.</h2><p className="mt-4 leading-7 text-emerald-50/90">Extraction sends your file or pasted text to this application’s server for in-memory processing. The application does not save it to a database or file storage, and no content is sent to an AI provider.</p></div>
+        <div><ShieldCheck aria-hidden="true" className="mb-5 size-7 text-emerald-200" /><h2 id="privacy-title" className="text-3xl leading-tight font-semibold tracking-tight">Clear about your privacy.</h2><p className="mt-4 leading-7 text-emerald-50/90">Extraction sends your file or pasted text to this application’s server for in-memory processing. The application does not save it to a database or file storage, and extraction does not send content to an AI provider.</p></div>
         <div className="space-y-5 text-sm leading-7 text-emerald-50/90">
-          <p className="flex gap-3"><LockKeyhole aria-hidden="true" className="mt-1 size-5 shrink-0" /><span>Your edits and job description stay in this page’s memory—not in an account or browser storage. Use Start over or reload to clear the page. The application does not log resume text.</span></p>
-          <p className="border-t border-white/20 pt-5">When AI review is added, confirmed text will need to be sent to the provider. That processing is not part of this phase.</p>
+          <p className="flex gap-3"><LockKeyhole aria-hidden="true" className="mt-1 size-5 shrink-0" /><span>Your edits and job description stay in this page’s memory unless you explicitly send reviewed previews for Gemini processing—not in an account or browser storage. Use Start over or reload to clear the page. The application does not log resume text.</span></p>
+          <p className="border-t border-white/20 pt-5">Optional Gemini review sends only the previews you review to Google after explicit consent. Best-effort redaction is not anonymity. Synthetic-only is the default because unpaid-service terms prohibit personal or confidential documents.</p>
         </div>
       </div>
     </section>

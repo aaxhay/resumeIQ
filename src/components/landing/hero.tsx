@@ -12,7 +12,7 @@ export function Hero() {
         </h1>
         <p className="mt-6 max-w-xl text-lg leading-8 text-muted-foreground">
           Your experience deserves to come through clearly. Set up a general
-          review, or focus on a specific job. Thoughtful AI feedback is the next step we’re building.
+          review, or focus on a specific job. Start with local text checks, then choose optional Gemini feedback when configured.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-5">
           <Link href="/review" className={buttonVariants({ size: "lg" })}>Review My Resume <ArrowRight aria-hidden="true" /></Link>
@@ -40,7 +40,7 @@ export function Hero() {
         </ul>
         <div className="flex items-start gap-3 border-t border-primary/15 pt-5 text-xs leading-6 text-muted-foreground">
           <MoveUpRight aria-hidden="true" className="mt-1 size-4 shrink-0" />
-          <p>Upload, confirm your text, and run explainable checks without scores. AI feedback and export are not available yet.</p>
+          <p>Upload, confirm your text, and run explainable checks without scores. Gemini feedback is optional, requires consent, and is synthetic-only by default. Export is not available yet.</p>
         </div>
       </aside>
     </section>
