@@ -9,5 +9,7 @@
 - `request.ts`: origin, content type, bounded streamed body, deadline, strict request validation.
 - `guard.ts`: bounded in-process concurrency/quotas/duplicate suppression using hashes and timestamps, never raw documents or output.
 - `errors.ts`: safe application errors; no provider payloads in client errors or logs.
+- `validation-failures.ts`: allowlisted public validation reasons and correction eligibility. Unknown causes stay private; transport, safety blocks, and incomplete/oversized output do not trigger correction.
+- `job-analysis.ts`: exact-evidence job inventory, conservative field extraction, and unassessed fallback requirements without additional provider calls.
 
 Real personal documents are gated on explicit operator configuration. See `docs/ai-integration.md` for terms, limits, configuration, verification, and public-release blockers. No automatic edits/export or persistent resume storage.

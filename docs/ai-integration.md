@@ -37,7 +37,7 @@ No raw resumes, provider outputs, or prompts are persisted or logged by the appl
 
 General review returns an assessment, exactly three priorities, evidenced strengths, coverage of all ten requested areas, detailed findings/recommendations, optional extractive rewrites, and limitations. Strong resumes may have no findings; priorities may preserve strengths or suggest optional improvements rather than manufacture defects.
 
-Job review additionally returns up to twenty explicit requirements with category, exact JD evidence, resume evidence when available, explanation/recommendation, and `supported`, `partially_supported`, `not_evidenced`, or `not_assessed`. Not evidenced is never proof of lacking a skill. This is a bounded, non-exhaustive comparison, not a fit score or hiring judgment.
+Job review additionally returns up to twenty explicit requirements with category, exact JD evidence, resume evidence when available, explanation/recommendation, and `supported`, `partially_supported`, `not_evidenced`, or `not_assessed`. Not evidenced is never proof of lacking a skill. This is a bounded, non-exhaustive comparison, not a fit score or hiring judgment. Sparse descriptions may return an empty comparison list rather than invented requirements. The results-dashboard milestone adds a validated `jobAnalysis` response field with conservative explicit-field extraction and unassessed fallback requirements, without an extra provider call; see [dashboard methodology](results-dashboard.md).
 
 ## Validation and hallucination limits
 
@@ -48,6 +48,14 @@ Suggested rewrites are deliberately **extractive shortening only**: original mus
 Exact quotes and lexical/number checks cannot prove semantic entailment, factual truth, preservation of qualifiers, or completeness. A model could misinterpret a negation or reuse an existing metric in the wrong context. The system prompt prohibits those behaviors; the UI still requires human verification and makes no hallucination-free claim. Prompt injection is untrusted document data, separated from system instructions in JSON. No tools, external retrieval, secrets, or privileged actions are exposed to the model. Tests exercise both resume and JD injection, but no prompt defense is a complete security guarantee.
 
 The generation schema omits costly length/pattern/item-count constraints that caused Gemini to reject the full nested schema. The instructions explicitly state the bounds, and **all original constraints remain mandatory in Zod after generation**. Never truncate or coerce malformed AI feedback into a success. Diagnostic labels expose no source/output values.
+
+## Validation-error recovery and safe diagnostics
+
+A later reliability fix labels previously unspecified validator failures: duplicate/missing coverage areas, duplicate finding IDs, high-impact findings without evidence, uncited rewrite originals, job matches in general mode, partial matches without evidence, and not-evidenced matches with contradictory citations. These now qualify for the existing single correction attempt instead of failing immediately. Validation itself is unchanged: repeated invalid output is still rejected, no citations or claims are repaired locally, and the same sixty-second/two-call maximum applies.
+
+Failure responses may include an allowlisted `validationIssue` (`format`, `coverage`, `evidence`, `rewrite`, `unsupported_claim`, `output_limit`, `blocked`, or `incomplete`). The UI renders static explanations, never raw provider messages, source text, diagnostic paths, or output. Blocked/truncated/empty/non-JSON responses remain non-correctable automatically; output limits and safety blocks are distinguished from evidence errors. Unknown causes receive no public diagnostic detail. A browser response-contract mismatch has its own UI explanation, including saving local edits before refreshing an outdated page.
+
+The user's original generic message alone does not establish which condition occurred. Final recovery verification: `npm run check` passed with **482 unit/integration tests**, **68 desktop/mobile browser/API tests**, lint, strict types, and production build. Regression cases cover every newly correctable failure, the two-call cap, no automatic correction of blocked/truncated output, safe allowlisted reasons, and UI error/focus/preview preservation. Two diagnostic synthetic general calls passed, followed by an actual PDF-upload/general-dashboard live Gemini success after the recovery change. Those checks do not prove that every document will produce valid feedback. Do not ask users to publish their resume or repeatedly incur retries just to diagnose an error; ask for the displayed safe reason instead.
 
 ## Limits, retries, and cost
 
@@ -63,7 +71,7 @@ The generation schema omits costly length/pattern/item-count constraints that ca
 
 `npm run check` runs deterministic tests with mocked provider boundaries, not paid requests. UI tests mock only `/api/reviews` and retain real extraction. `npm run test:ai:live` is separate, explicit, may incur charges, and uses only checked-in synthetic fixtures against configured Gemini. It exercises general, job-specific, resume-injection, and job-injection cases and prints only validation metadata/safe errors, never full resumes or provider output.
 
-Final verification on 2026-11-06:
+Historical AI-integration milestone verification on 2026-11-06 (subsequent dashboard checks and fresh live outcomes are in [results-dashboard.md](results-dashboard.md)):
 
 - `npm run check`: lint and strict TypeScript passed; **366 tests across 14 files**, production build, and **62 desktop/mobile browser/API tests** passed. This includes 100 new unit/integration cases and 22 new AI UI browser cases. Provider mocks do not count as live success.
 - `npm run test:ai:live`: actual `gemini-3.5-flash-lite` returned validated general and job-specific feedback, plus valid resume-injection and JD-injection responses. Each returned three priorities and all ten coverage areas; job cases returned three requirements. Injection canaries were not followed and unsupported Kubernetes was not classified supported. The harness also permits a safe validation rejection for adversarial injection cases, but that fallback was not used in this final run.

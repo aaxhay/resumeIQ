@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { Textarea } from "@/components/ui/textarea";
-import { availabilitySchema, MAX_AI_TEXT, reviewRequestSchema, reviewResponseSchema, type AiReview as Review } from "@/lib/ai-review/contracts";
+import { availabilitySchema, MAX_AI_TEXT, reviewRequestSchema, reviewResponseSchema, type ValidationIssue } from "@/lib/ai-review/contracts";
 import { prepareAiText } from "@/lib/ai-review/privacy";
 import type { ReviewMode } from "../review-options";
+import { ResultsDashboard } from "./results/results-dashboard";
+import { ResultsSkeleton } from "./results/results-skeleton";
 
 type Availability = ReturnType<typeof availabilitySchema.parse>;
 type Response = ReturnType<typeof reviewResponseSchema.parse>;
@@ -24,41 +26,16 @@ const ERROR_MESSAGES: Record<Extract<Response, { ok: false }>["error"]["code"], 
   INVALID_RESPONSE: "The response could not be validated. No AI feedback is shown. You can retry explicitly.",
   PROVIDER_ERROR: "Gemini could not complete this review. Your previews are preserved. You can retry explicitly.",
 };
-const STATUS_LABELS = { supported: "Supported", partially_supported: "Partially supported", not_evidenced: "Not evidenced", not_assessed: "Not assessed" };
-const label = (value: string) => value.replaceAll("_", " ");
-
-function Evidence({ quotes, source = "Resume preview" }: { quotes: string[]; source?: string }) {
-  return quotes.length ? <div className="mt-3 space-y-2 text-sm">
-    <p className="font-medium">{source} evidence</p>
-    {quotes.map((quote, index) => <blockquote key={index} className="border-l-2 border-input pl-3 whitespace-pre-wrap [overflow-wrap:anywhere]">{quote}</blockquote>)}
-  </div> : <p className="mt-3 text-xs text-muted-foreground">No specific resume-preview citation supplied.</p>;
-}
-
-function Feedback({ data, mode }: { data: Review; mode: ReviewMode }) {
-  return <div className="space-y-7 text-sm leading-6 [overflow-wrap:anywhere]">
-    <section><h4 className="font-semibold">Overall assessment</h4><p className="mt-2">{data.assessment}</p></section>
-    <section aria-labelledby="ai-priorities"><h4 id="ai-priorities" className="font-semibold">Three priorities</h4>
-      <ol className="mt-3 list-decimal space-y-4 pl-5">{data.priorities.map((item, index) => <li key={index}><h5 className="font-medium">{item.title}</h5><p>{item.recommendation}</p><Evidence quotes={item.resumeEvidence} /></li>)}</ol>
-    </section>
-    <section><h4 className="font-semibold">Strengths</h4><ul className="mt-3 space-y-4">{data.strengths.map((item, index) => <li key={index}><h5 className="font-medium">{item.title}</h5><p>{item.explanation}</p><Evidence quotes={item.resumeEvidence} /></li>)}</ul></section>
-    <section><h4 className="font-semibold">Coverage areas</h4><ul className="mt-3 space-y-3">{data.areas.map((item, index) => <li key={index}><span className="font-medium capitalize">{item.area}</span> · {item.status === "assessed" ? "Assessed" : "Not assessed"}<p className="text-muted-foreground">{item.explanation}</p></li>)}</ul></section>
-    <section><h4 className="font-semibold">Findings and evidence</h4>
-      {!data.findings.length && <p className="mt-2">No specific findings returned. This does not mean the resume is complete or error-free.</p>}
-      <ul className="mt-3 space-y-4">{data.findings.map((item, index) => <li key={index} className="rounded-xl border p-4">
-        <p className="text-xs capitalize">{item.area} · {item.impact} impact (AI judgment)</p><h5 className="mt-2 font-medium">{item.issue}</h5>
-        <p className="mt-2"><strong>Why it matters:</strong> {item.whyItMatters}</p><p className="mt-2"><strong>Recommendation:</strong> {item.recommendation}</p>
-        <Evidence quotes={item.resumeEvidence} />
-        {item.suggestedRewrite && <div className="mt-4 rounded-lg bg-muted/50 p-3"><h6 className="font-medium">Optional extractive rewrite · not applied</h6><p className="mt-2">Verify the meaning and facts before using it. Nothing is changed in your resume.</p><p className="mt-3 font-medium">Original preview text</p><blockquote className="whitespace-pre-wrap">{item.suggestedRewrite.original}</blockquote><p className="mt-3 font-medium">Suggested wording</p><blockquote className="whitespace-pre-wrap">{item.suggestedRewrite.revised}</blockquote></div>}
-      </li>)}</ul>
-    </section>
-    {mode === "job-specific" && <section><h4 className="font-semibold">Job evidence comparison</h4><p className="mt-2">“Not evidenced” means the supplied resume preview does not demonstrate a requirement—not that you lack the skill. These are AI judgments, not hiring decisions.</p>
-      {!data.jobMatches.length && <p className="mt-2">No job comparisons returned; no fit conclusion can be drawn.</p>}
-      <ul className="mt-3 space-y-4">{data.jobMatches.map((item, index) => <li key={index} className="rounded-xl border p-4"><p className="text-xs capitalize">{label(item.category)}</p><h5 className="mt-2 font-medium">{item.requirement}</h5><p className="mt-2 font-medium">{STATUS_LABELS[item.status]}</p><p className="mt-2">{item.explanation}</p><Evidence quotes={[item.jobEvidence]} source="Job description preview" /><Evidence quotes={item.resumeEvidence} /><p className="mt-3"><strong>Recommendation:</strong> {item.recommendation}</p></li>)}</ul>
-    </section>}
-    <section><h4 className="font-semibold">Review limitations</h4><ul className="mt-2 list-disc space-y-2 pl-5">{data.limitations.map((item, index) => <li key={index}>{item}</li>)}</ul></section>
-  </div>;
-}
-
+const VALIDATION_MESSAGES: Record<ValidationIssue, string> = {
+  format: "Gemini returned an invalid response format. Your resume is not being judged by this error.",
+  coverage: "Gemini omitted or repeated required review sections. This is a response-generation error, not a problem with your resume.",
+  evidence: "Gemini returned missing, inconsistent, or non-matching evidence citations. The response was rejected to avoid showing unsupported advice.",
+  rewrite: "Gemini returned a rewrite that failed the source-evidence checks. Nothing has been applied to your resume.",
+  unsupported_claim: "Gemini introduced an unverified number or an unsupported job-match claim. The response was rejected rather than displaying that claim.",
+  output_limit: "Gemini reached a response-size limit. No partial analysis is shown. A shorter preview may help, but do not remove relevant facts just to obtain a result.",
+  blocked: "Gemini did not return a usable response because of a provider content restriction. Repeated retries may not help; local text checks remain available.",
+  incomplete: "Gemini returned an empty or incomplete response. No partial analysis is shown.",
+};
 /** Mount only while upstream text and review preferences are confirmed. */
 export function AiReview({ text, jobDescription, mode }: { text: string; jobDescription: string; mode: ReviewMode }) {
   const [resumePreview, setResumePreview] = useState(() => prepareAiText(text));
@@ -139,10 +116,13 @@ export function AiReview({ text, jobDescription, mode }: { text: string; jobDesc
       const response = await fetch("/api/reviews", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(parsed.data), signal: controller.signal });
       const payload = reviewResponseSchema.safeParse(await response.json());
       if (request.current !== controller) return;
-      if (!payload.success || (payload.data.ok && !response.ok)) {
-        setError(ERROR_MESSAGES.INVALID_RESPONSE);
+      if (!payload.success || (payload.data.ok && (!response.ok || (mode === "general") !== (payload.data.jobAnalysis === null)))) {
+        setError("The response could not be validated because it did not match this page’s response contract. Your previews are preserved. If the app was updated while this page was open, save your edits locally before refreshing. (Reason: response_contract)");
       } else if (!payload.data.ok) {
-        setError(ERROR_MESSAGES[payload.data.error.code]);
+        const failure = payload.data.error;
+        setError(failure.code === "INVALID_RESPONSE" && failure.validationIssue
+          ? `The response could not be validated. ${VALIDATION_MESSAGES[failure.validationIssue]} (Reason: ${failure.validationIssue})`
+          : ERROR_MESSAGES[failure.code]);
       } else {
         setResult(payload.data);
       }
@@ -182,11 +162,12 @@ export function AiReview({ text, jobDescription, mode }: { text: string; jobDesc
         </div>
       </form>
       <p role="status" className="text-sm leading-6 text-muted-foreground">{result ? "Gemini feedback is ready. Inspect the evidence and limitations below." : status}</p>
+      {pending && <ResultsSkeleton />}
       {error && <Notice id="ai-review-error" ref={errorPanel} tabIndex={-1} role="alert" tone="error"><p>{error}</p><p className="mt-2">No AI feedback is shown. Check the previews, then use Retry Gemini review to make a new request. Local checks remain available.</p></Notice>}
       {result && <div ref={resultsPanel} tabIndex={-1} aria-labelledby="ai-results-title" data-testid="ai-review-results" className="min-w-0 space-y-5 rounded-sm border-t pt-5">
         <div><h3 id="ai-results-title" className="text-lg font-semibold">Gemini review complete</h3><p className="mt-2 text-xs [overflow-wrap:anywhere]">Response model: {result.model}</p></div>
         <Notice>Exact citations are checked against the submitted text, but semantic claims may still be wrong. This is not factual verification, an ATS score, or a hiring guarantee. Verify every suggestion. {result.redacted && "Additional best-effort redaction was applied by the server; some citations may contain redaction placeholders."} Evidence refers to the sent previews, not the original editor.</Notice>
-        <Feedback data={result.data} mode={mode} />
+        <ResultsDashboard data={result.data} mode={mode} jobAnalysis={result.jobAnalysis} />
       </div>}
     </section>
   </Card>;

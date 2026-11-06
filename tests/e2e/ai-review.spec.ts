@@ -1,25 +1,22 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
-import { AREAS, reviewRequestSchema, reviewResponseSchema, type ReviewRequest } from "../../src/lib/ai-review/contracts";
+import { AREAS, reviewRequestSchema, type AiReview, type ReviewRequest } from "../../src/lib/ai-review/contracts";
 import { prepareAiText } from "../../src/lib/ai-review/privacy";
+import { dashboardJob, dashboardJobMatches, dashboardResponse } from "../fixtures/dashboard";
 
 const resume = "Fictional Person\nfictional@example.test | https://example.test | +1 202 555 0199\n\nEXPERIENCE\nBuilt accessible tools with automated tests for fictional teams.\nDocumented development practices and supported peer reviews.";
 const preview = "EXPERIENCE\nBuilt accessible tools with automated tests for fictional teams.\nDocumented development practices and supported peer reviews.";
 const quote = "Built accessible tools with automated tests for fictional teams.";
 const job = "A fictional role building accessible tools and automated tests. Contact fictional@example.test for synthetic details.";
-const jobPreview = "A fictional role building accessible tools and automated tests. Collaborate with a fictional development team.";
-const success = reviewResponseSchema.parse({
-  ok: true, model: "gemini-synthetic-test", redacted: false,
-  data: {
-    assessment: "Synthetic assessment: <img src=x onerror=alert(1)> is displayed as text, never HTML.",
+const jobPreview = dashboardJob;
+const review: AiReview = {
+    assessment: "Synthetic assessment: <img src=x onerror=alert('synthetic')> is displayed as text, never HTML.",
     priorities: ["Clarify context", "Inspect wording", "Keep evidence"].map((title) => ({ title, recommendation: "Consider a clearer presentation without adding facts.", resumeEvidence: [quote] })),
     strengths: [{ title: "Concrete work", explanation: "The preview describes development work.", resumeEvidence: [quote] }],
     areas: AREAS.map((area) => ({ area, status: area === "summary" ? "not_assessed" : "assessed", explanation: "Limited synthetic review of this preview only." })),
-    findings: [{ id: "clarify-context", area: "clarity", impact: "low", issue: "Consider a shorter sentence.", whyItMatters: "Short wording may help readability.", recommendation: "Inspect this optional extractive wording.", resumeEvidence: [quote], suggestedRewrite: { original: quote, revised: "Built accessible tools with automated tests." } }],
+    findings: [{ id: "clarify-context", area: "clarity", impact: "low", issue: "Consider a shorter sentence.", whyItMatters: "Short wording may help readability.", recommendation: "Inspect this optional extractive wording.", resumeEvidence: [quote], suggestedRewrite: { original: quote, revised: "Built accessible tools with automated tests" } }],
     jobMatches: [], limitations: ["This synthetic fixture is not factual verification."],
-  },
-});
-if (!success.ok) throw new Error("Expected success fixture");
-const jobSuccess = reviewResponseSchema.parse({ ...success, data: { ...success.data, jobMatches: (["supported", "partially_supported", "not_evidenced", "not_assessed"] as const).map((status) => ({ category: "required_skill", requirement: `Accessible development (${status})`, jobEvidence: "A fictional role building accessible tools and automated tests.", status, resumeEvidence: status === "supported" ? [quote] : [], explanation: "Only supplied preview evidence is considered.", recommendation: "Add supporting evidence only if it is true." })) } });
+};
+const success = (body: ReviewRequest) => dashboardResponse(body, { ...review, jobMatches: body.mode === "job-specific" ? dashboardJobMatches(quote) : [] });
 
 const send = (page: Page) => page.getByRole("button", { name: "Send previews to Gemini", exact: true });
 const consent = (page: Page) => page.getByRole("checkbox", { name: /I consent to transferring these previews to Google/ });
@@ -38,7 +35,7 @@ async function mockReviews(page: Page, options: MockOptions = {}) {
     const body = reviewRequestSchema.parse(route.request().postDataJSON());
     requests.push(body);
     if (options.post) await options.post(route, body);
-    else await route.fulfill({ json: body.mode === "general" ? success : jobSuccess });
+    else await route.fulfill({ json: success(body) });
   });
   return requests;
 }
@@ -91,13 +88,19 @@ test("explicit general review sends only edited previews and renders escaped evi
   expect(requests[0]).not.toHaveProperty("jobDescription");
   expect(JSON.stringify(requests[0])).not.toContain("fictional@example.test");
   await expect(results(page).getByText(/Response model: gemini-synthetic-test/)).toBeVisible();
-  await expect(results(page).getByRole("region", { name: "Three priorities" }).getByRole("listitem")).toHaveCount(3);
-  await expect(results(page).getByRole("heading", { name: "Coverage areas" })).toBeVisible();
+  const priorities = results(page).locator("section").filter({ has: page.getByRole("heading", { name: "Three priorities", exact: true }) });
+  await expect(priorities.getByRole("listitem")).toHaveCount(3);
+  await expect(results(page).getByText("Coverage areas", { exact: true })).toBeVisible();
   await expect(results(page).getByRole("heading", { name: "Strengths", exact: true })).toBeVisible();
+  await expect(results(page).getByRole("heading", { name: "Optional extractive rewrite · not applied" })).toBeHidden();
+  await results(page).locator("summary").filter({ hasText: "Consider a shorter sentence." }).click();
   await expect(results(page).getByRole("heading", { name: "Optional extractive rewrite · not applied" })).toBeVisible();
-  await expect(results(page).getByText(success.data.assessment)).toBeVisible();
+  await expect(results(page).getByText(review.assessment)).toBeVisible();
   await expect(results(page).locator("img")).toHaveCount(0);
-  await expect(results(page).getByText(/semantic claims may still be wrong/)).toBeVisible();
+  const limitations = results(page).locator("summary").filter({ hasText: /^Review limitations$/ });
+  await limitations.click();
+  await expect(limitations.locator("..").getByText(/semantic claims may still be wrong/)).toBeVisible();
+  await expect(results(page).getByRole("heading", { name: "Job evidence comparison" })).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "Editable resume text" })).toHaveValue(resume);
   await expect(send(page)).toBeDisabled();
   await page.setViewportSize({ width: 320, height: 900 });
@@ -123,9 +126,14 @@ test("job-specific review uses both minimized previews and labels evidence witho
   await send(page).click();
   await expect(results(page)).toBeVisible();
   expect(requests[0]).toMatchObject({ mode: "job-specific", resumeText: preview, jobDescription: jobPreview });
-  for (const status of ["Supported", "Partially supported", "Not evidenced", "Not assessed"]) await expect(results(page).getByText(status, { exact: true }).first()).toBeVisible();
+  const comparison = results(page).getByRole("region", { name: "Job evidence comparison" });
+  for (const status of ["Supported", "Partially supported", "Not evidenced", "Not assessed"]) {
+    await expect(comparison.locator("summary").filter({ hasText: `${status} · AI judgment` }).first()).toBeVisible();
+  }
   await expect(results(page).getByText(/not that you lack the skill/)).toBeVisible();
-  await expect(results(page).getByText("Job description preview evidence").first()).toBeVisible();
+  const supportedRequirement = comparison.locator("summary").filter({ hasText: "accessible tools" }).first();
+  await supportedRequirement.click();
+  await expect(supportedRequirement.locator("..").getByText("Job description preview evidence · exact text", { exact: true })).toBeVisible();
   await jd.fill(`${jobPreview} Updated scope.`);
   await expect(results(page)).toHaveCount(0);
   await send(page).click();
@@ -177,11 +185,14 @@ test("operator personal-data setting never implies a paid tier and still require
 test("loading prevents duplicates, cancel aborts waiting, and late responses cannot restore feedback", async ({ page }) => {
   let release!: () => void;
   const gate = new Promise<void>((resolve) => { release = resolve; });
-  const requests = await mockReviews(page, { post: async (route) => { await gate; await route.fulfill({ json: success }).catch(() => undefined); } });
+  const requests = await mockReviews(page, { post: async (route, body) => { const response = success(body); await gate; await route.fulfill({ json: response }).catch(() => undefined); } });
   await prepare(page);
   await authorize(page);
   await send(page).click();
   await expect(page.getByRole("button", { name: "Requesting Gemini review…" })).toBeDisabled();
+  await expect(page.getByRole("status").filter({ hasText: "Preparing your review" })).toBeVisible();
+  await expect(page.getByText("Waiting for the validated response. No results are available yet.")).toBeVisible();
+  await expect(results(page)).toHaveCount(0);
   // Even a second programmatic form submission cannot create a duplicate POST.
   await page.getByRole("form", { name: "Gemini review consent and previews" }).evaluate((form: HTMLFormElement) => form.requestSubmit());
   await expect.poll(() => requests.length).toBe(1);
@@ -199,7 +210,7 @@ for (const mutation of ["preview", "consent", "upstream"] as const) {
   test(`${mutation} change invalidates an in-flight response`, async ({ page }) => {
     let release!: () => void;
     const gate = new Promise<void>((resolve) => { release = resolve; });
-    const requests = await mockReviews(page, { post: async (route) => { await gate; await route.fulfill({ json: success }).catch(() => undefined); } });
+    const requests = await mockReviews(page, { post: async (route, body) => { const response = success(body); await gate; await route.fulfill({ json: response }).catch(() => undefined); } });
     await prepare(page);
     await authorize(page);
     await send(page).click();
@@ -215,13 +226,32 @@ for (const mutation of ["preview", "consent", "upstream"] as const) {
   });
 }
 
+test("validation failure explains its safe reason and preserves previews for an explicit retry", async ({ page }) => {
+  const requests = await mockReviews(page, { post: async (route) => {
+    await route.fulfill({ status: 502, json: { ok: false, error: { code: "INVALID_RESPONSE", message: "PRIVATE_PROVIDER_DETAIL", retryable: true, validationIssue: "evidence" } } });
+  } });
+  await prepare(page);
+  await authorize(page);
+  await send(page).click();
+  const alert = page.getByRole("region", { name: "Gemini AI review", exact: true }).getByRole("alert");
+  await expect(alert).toBeFocused();
+  await expect(alert).toContainText("missing, inconsistent, or non-matching evidence citations");
+  await expect(alert).toContainText("Reason: evidence");
+  await expect(page.getByText("PRIVATE_PROVIDER_DETAIL")).toHaveCount(0);
+  await expect(results(page)).toHaveCount(0);
+  await expect(resumeInput(page)).toHaveValue(prepareAiText(resume));
+  await expect(page.getByRole("button", { name: "Retry Gemini review", exact: true })).toBeEnabled();
+  expect(requests).toHaveLength(1);
+});
+
 test("validation sends nothing, malformed response is rejected, and explicit retries use new IDs", async ({ page }) => {
   let attempt = 0;
-  const requests = await mockReviews(page, { post: async (route) => {
+  const requests = await mockReviews(page, { post: async (route, body) => {
+    const response = success(body);
     attempt++;
-    if (attempt === 1) await route.fulfill({ json: { ...success, data: { ...success.data, priorities: [] } } });
+    if (attempt === 1) await route.fulfill({ json: { ...response, data: { ...response.data, priorities: [] } } });
     else if (attempt === 2) await route.fulfill({ status: 502, json: { ok: false, error: { code: "PROVIDER_ERROR", message: "Do not render raw upstream content", retryable: true } } });
-    else await route.fulfill({ json: success });
+    else await route.fulfill({ json: response });
   } });
   await prepare(page);
   await authorize(page);
