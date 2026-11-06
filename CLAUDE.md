@@ -8,7 +8,7 @@ Build a reliable 1–2 day MVP for anyone improving a resume. Required modes:
 
 Required order: Upload Resume → Choose Review Mode → Confirm Extracted Text → Analyze → Review Feedback → Improve Resume → Export DOCX.
 
-Current authorized milestone is **deterministic resume text analysis**, following upload, extraction, and editable confirmation. `/review` supports PDF/DOCX or pasted text, review modes, server extraction, completeness warnings, editing, confirmation, explicit local text checks, evidence selection, cancellation, and reset. Do not implement AI analysis, job-description matching, generated improvements, persistence, or export until requested. Do not add fake scores, seeded feedback, or controls that appear to perform unimplemented actions. Confirmation alone does not run analysis.
+Current authorized milestone is **Gemini AI resume review and job matching**, following deterministic checks. Keep local text checks independent. AI review requires confirmed text, an editable minimized provider preview, explicit consent, server-only credentials/model, bounded requests, and validated evidence-backed output. The provider-independent interface also supports conservative extractive bullet shortening; no automatic edits or export. Do not add persistence, cloud deployment, unrestricted generative rewriting, or export until requested. No scores or fake AI results. Configuration is synthetic-only by default; real personal data requires explicit operator-reviewed paid-service policy. See `docs/ai-integration.md`. Never claim live success from mocks.
 
 Keep `src/lib/resume-analysis` pure and independent of React, Next, providers, I/O, clocks, and randomness. Validate input/options; retain stable IDs and exact evidence offsets. Distinguish objective observations from optional stylistic suggestions. Never infer missing facts, require metrics in every bullet, or present heuristic thresholds as industry standards. Projects relevance must be explicit. Test rules independently before UI integration and invalidate findings on source/preferences changes. See `docs/deterministic-analysis.md` for the contract and limitations.
 
@@ -44,7 +44,8 @@ Run production and development E2E sequentially (ports 3100 and 3101 respectivel
 - `src/lib/resume-analysis`: standalone `analyzeResume(text, options)` with strict input contracts, deterministic rule groups, exact evidence, and no scores, I/O, or framework dependency. The UI invokes this shared implementation rather than duplicating rules.
 - `src/lib/config`: pure configuration validation; never read secrets from a client module.
 - `src/server/config`: server-only environment access, validated when needed rather than at build time.
-- `src/server/ai`: future server-only Gemini adapter and response validation.
+- `src/lib/ai-review`: shared strict request/response schemas and best-effort contact minimization.
+- `src/server/ai`: provider-independent interface, server-only Gemini adapter, bounded requests, local duplicate/cost guards, and strict output/evidence validation. Only the adapter imports SDK types.
 - `src/server/resume-processing`: bounded input, server file validation, child-process lifecycle, PDF/DOCX extractors, normalization, and completeness checks. Node 24 runs owned TypeScript worker source; preserve source files/runtime dependencies in deployment.
 - `src/server/documents`: future DOCX export.
 - `src/server/data`: reserved for persistence only if genuinely needed.

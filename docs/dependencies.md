@@ -39,16 +39,15 @@ The local runtime is Node 24.20.0 / npm 11.19.0. Project engines deliberately ta
 
 Runtime modules are loaded by a separate Node 24 process, not bundled into browser code. See `extraction.md` for full-source deployment requirements and compatibility limits.
 
+## AI dependency (installed 2026-11-06)
+
+`@google/genai` **3.0.0** is pinned as the maintained official SDK, requiring Node >=22 (compatible with Node 24). The legacy `@google/generativeai` is not installed. SDK types stay inside the server adapter. Authenticated model listing, structured generation, and both review modes were tested with `gemini-3.5-flash-lite`; SDK compatibility alone was not treated as model availability. Current docs, terms, and validation limits are in [ai-integration.md](ai-integration.md).
+
+Installation reported transitive `node-domexception` deprecation and a `protobufjs` postinstall script not approved by npm's script policy. No blanket script approval was granted; build and live generation worked without it. No force audit fixes.
+
 ## Deliberately deferred packages
 
-Candidate pins from earlier metadata checks, **not installed or integration-tested**. Recheck before implementing.
-
-| Package | Checked version | Node engine | Decision |
-| --- | --- | --- | --- |
-| `@google/genai` | 3.0.0 | >=22 | Maintained Google SDK; future analysis only |
-| `@supabase/supabase-js` | 2.119.0 | >=22 | Unneeded for the memory-only MVP |
-
-Model availability is not established by SDK compatibility. `.env.example` requires an explicitly selected Gemini model; no credentialed model request has been made. Parser bundling and resource behavior must be validated in the actual deployment environment.
+`@supabase/supabase-js` 2.119.0 (Node >=22) was checked earlier but remains uninstalled; persistence is unneeded. Recheck metadata before any future adoption. Parser bundling/resource behavior and AI controls still require actual deployment verification.
 
 ## Tooling compatibility exception
 
@@ -58,7 +57,7 @@ The checked latest ESLint was 10.14.0. Next's dependency `eslint-plugin-react` 7
 
 ## Security audit snapshot
 
-Audit rerun after installing extraction dependencies on 2026-11-06 (unchanged from foundation):
+Audit rerun after installing the Gemini SDK on 2026-11-06 (unchanged from the extraction milestone):
 
 - `npm audit --omit=dev`: **0 reported vulnerabilities**.
 - Full `npm audit`: **13 affected dependency entries — 2 low, 11 moderate; no high or critical**. These are development/build tooling dependencies, not 13 independent root vulnerabilities.

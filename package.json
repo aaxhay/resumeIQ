@@ -15,12 +15,14 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:ai:live": "node --env-file=.env.local --conditions=react-server scripts/verify-gemini.ts",
     "test:e2e": "playwright test",
     "test:e2e:dev": "playwright test --config=playwright.dev.config.ts",
     "check": "npm run lint && npm run typecheck && npm test && npm run build && npm run test:e2e"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
+    "@google/genai": "3.0.0",
     "class-variance-authority": "0.7.1",
     "cn": "0.5.2",
     "fast-xml-parser": "5.12.0",

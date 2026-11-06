@@ -8,7 +8,7 @@ import { ReviewSetupForm } from "@/features/review/components/review-setup-form"
 
 export const metadata: Metadata = {
   title: "Set up your review — ResumeIQ",
-  description: "Upload a PDF or DOCX, or paste your resume. Inspect, edit, and confirm the text before future AI review.",
+  description: "Upload a PDF or DOCX, or paste your resume. Inspect, edit, and confirm the text before local text checks or optional, consent-based Gemini review.",
 };
 
 export default function ReviewPage() {
@@ -24,7 +24,7 @@ export default function ReviewPage() {
         </div>
         <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div className="min-w-0">
-            <Notice className="mb-5"><strong className="text-foreground">Text extraction is ready.</strong> Upload or paste, confirm your edits, then run explainable text checks. AI analysis and export are not available yet.</Notice>
+            <Notice className="mb-5"><strong className="text-foreground">Text extraction is ready.</strong> Upload or paste, confirm your edits, then run explainable text checks. Optional Gemini review requires configuration, preview review, and explicit consent. Synthetic-only by default; export is not available yet.</Notice>
             <noscript><Notice tone="error" className="mb-5">Enable JavaScript to upload a file or paste text. Nothing has been uploaded.</Notice></noscript>
             <ReviewSetupForm />
           </div>
@@ -33,7 +33,7 @@ export default function ReviewPage() {
               <LockKeyhole aria-hidden="true" className="mb-4 size-5 text-primary" />
               <h2 className="font-semibold">Your text. In your control.</h2>
               <p className="mt-3 text-sm leading-7 text-muted-foreground">Files and pasted text go to this application’s server only when you request extraction. They are processed in memory, without application file storage or AI requests.</p>
-              <p className="mt-3 text-sm leading-7 text-muted-foreground">Edits and job descriptions stay in this page’s memory. Use Start over or reload to clear them.</p>
+              <p className="mt-3 text-sm leading-7 text-muted-foreground">Edits and job descriptions stay in this page’s memory unless you explicitly send reviewed previews to Google for Gemini processing. Use Start over or reload to clear the page; this cannot undo a provider transfer.</p>
               <Link href="/#privacy" className="mt-4 inline-block rounded-sm text-sm font-medium text-primary underline underline-offset-4">About your privacy</Link>
             </section>
             <section className="px-1">

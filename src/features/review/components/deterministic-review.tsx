@@ -40,7 +40,7 @@ export function DeterministicReview({ text, onInspectEvidence }: Props) {
         <p className="eyebrow">No AI · No scores</p>
         <h2 id="text-checks-title" className="mt-2 text-xl font-semibold">Explainable resume text checks</h2>
         <p className="mt-3 text-sm leading-7 text-muted-foreground">These limited, English-oriented rules check the text you confirmed—not the original layout, factual accuracy, hiring suitability, or ATS compatibility. Writing suggestions are optional, and missing numbers do not make a bullet weak.</p>
-        <p className="mt-2 text-sm leading-7 text-muted-foreground">Checks run in this browser, without network requests. Both review modes use the same rules; job-description matching and AI review are not implemented.</p>
+        <p className="mt-2 text-sm leading-7 text-muted-foreground">Checks run in this browser, without network requests. Both review modes use the same rules; these local checks do not compare job descriptions. Optional Gemini review is separate and requires consent below.</p>
         <label className="mt-4 flex min-h-11 cursor-pointer items-start gap-3 text-sm leading-6">
           <input type="checkbox" className="mt-1 size-4 shrink-0 accent-primary" checked={projectsRelevant} onChange={(event) => { setProjectsRelevant(event.target.checked); setFindings(undefined); setError(undefined); }} />
           <span>Projects are relevant to this resume—check for a projects section.<span className="mt-1 block text-xs text-muted-foreground">Optional. Relevance is your choice, not an inference about your career.</span></span>
