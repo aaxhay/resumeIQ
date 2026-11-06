@@ -1,4 +1,5 @@
 import type { ValidationIssue } from "../../lib/ai-review/contracts.ts";
+import { decodeClaimProblems } from "./claim-diagnostics.ts";
 
 // Only these static diagnostics can cross the API boundary or trigger correction.
 // Never return a provider message, rejected output, or the original cause string.
@@ -13,8 +14,8 @@ const failures: Readonly<Record<string, { issue: ValidationIssue; correctable: b
   "conflicting-match-evidence": { issue: "evidence", correctable: true },
   "non-extractive-rewrite": { issue: "rewrite", correctable: true },
   "uncited-rewrite": { issue: "rewrite", correctable: true },
-  "introduced-number": { issue: "unsupported_claim", correctable: true },
-  "unsupported-requirement-claim": { issue: "unsupported_claim", correctable: true },
+  "introduced-number": { issue: "unverified_number", correctable: true },
+  "unsupported-requirement-claim": { issue: "job_claim", correctable: true },
   "requirement-not-in-job-evidence": { issue: "evidence", correctable: true },
   "output-token-limit": { issue: "output_limit", correctable: false },
   "oversized-output": { issue: "output_limit", correctable: false },
@@ -25,6 +26,13 @@ const failures: Readonly<Record<string, { issue: ValidationIssue; correctable: b
 };
 export function validationFailure(reason: unknown) {
   if (typeof reason !== "string") return undefined;
+  const problems = decodeClaimProblems(reason);
+  if (problems) {
+    const numbers = problems.some(problem => problem.reason === "introduced-number");
+    const matches = problems.some(problem => problem.reason === "unsupported-requirement-claim");
+    const issue: ValidationIssue = numbers && matches ? "unsupported_claim" : numbers ? "unverified_number" : "job_claim";
+    return { issue, correctable: true };
+  }
   // Schema diagnostics carry validator-generated paths/codes internally only.
   const key = reason.startsWith("schema-shape-or-bounds:") ? "schema-shape-or-bounds" : reason;
   return Object.hasOwn(failures, key) ? failures[key] : undefined;

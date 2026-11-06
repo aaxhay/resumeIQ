@@ -1,6 +1,6 @@
 # ResumeIQ
 
-A resume-review application with **PDF/DOCX extraction, editable confirmation, local deterministic checks, and optional Gemini AI feedback**. General and job-specific results include a grouped, collapsible dashboard; job review adds explicit job fields and requirement-level evidence statuses. No ATS scores, hiring guarantees, automatic resume changes, or export.
+A resume-review application with **PDF/DOCX extraction, editable confirmation, local deterministic checks, and optional Gemini AI feedback**. General and job-specific results include a grouped, collapsible dashboard; job review adds explicit job fields and requirement-level evidence statuses. Controlled improvement adds a separate draft with accept/reject, manual wording edits, undo, and restore. No ATS scores, hiring guarantees, automatic resume changes, or export.
 
 ## Local setup
 
@@ -12,6 +12,8 @@ npm run dev
 ```
 
 Open **http://localhost:3000/review**. Upload a PDF/DOCX up to 5 MiB or paste text; select a mode; extract/prepare; inspect and edit; confirm. **Run text checks** executes local rules without provider calls. For optional AI feedback, review the minimized provider previews, remove unnecessary personal information, give explicit consent, and choose **Send previews to Gemini**.
+
+After Gemini results, choose **Improve this resume**. Compare suggestions, choose a location for repeated text, save manual wording, then accept or reject each change. Undo the latest accepted edit or restore the original. The draft is separate from the confirmed source and survives changes to review inputs; replacing it or starting over requires confirmation. It is memory-only: copy anything you want to retain before leaving. These controls make no additional AI calls. See [controlled improvement](docs/resume-improvement.md).
 
 Job-specific mode requires a 50–10,000-character job description. It stays local during extraction/local checks and is sent to Gemini only through the explicit AI action. AI resumes are limited to 30,000 characters; extraction/editing separately allows 80,000. No silent input truncation.
 
@@ -52,6 +54,7 @@ src/lib/resume/              Shared extraction contracts and limits
 src/lib/resume-analysis/     Pure deterministic analyzer and evidence rules
 src/lib/ai-review/           Strict AI contracts and contact minimization
 src/lib/job-description/     Pure explicit-field extraction and evidence contracts
+src/lib/resume-improvement/  Immutable-original patches, suggestion states, local undo
 src/lib/config/             Pure configuration validation
 src/server/resume-processing/ Bounded isolated PDF/DOCX extraction
 src/server/ai/               Provider interface, Gemini adapter, validation, cost guards
@@ -66,17 +69,23 @@ The rest of the application uses `ResumeAiProvider`, not Gemini SDK types. Model
 ## Current limits and release blockers
 
 - English-oriented text analysis, not original-layout assessment, fact checking, or exhaustive job coverage.
-- No accounts/history, database, OCR, legacy DOC, billing UI, public deployment, full generative rewriting, or DOCX export.
+- No accounts/saved review history, database, OCR, legacy DOC, billing UI, public deployment, full generative rewriting, or DOCX export. The editing workspace has only a memory-local accepted-edit history.
 - AI requests have deadlines, duplicate suppression, local concurrency and request caps. These are **not distributed abuse protection or monetary budgets**; do not expose the endpoint publicly until authenticated/trusted ingress, distributed controls, provider budget limits, and deployment behavior are verified.
 - Local full-project Node execution is supported. Keep worker sources and runtime dependencies; `.next`-only, standalone, Edge, and serverless packaging are not verified. Builds use system fonts without external font fetching.
 - Existing tooling advisories and compatibility exceptions are documented; no forced dependency fixes.
 
 ## Documentation and verification
 
-Latest validation-recovery quality gate: **482 unit/integration tests**, **68 desktop/mobile browser/API tests**, lint, strict types, and production build passed. Invalid Gemini output remains rejected; additional structural/evidence failures now qualify for the existing single correction attempt, and the UI displays safe failure categories without document contents.
+Job-specific claim recovery: a live synthetic composite job description reproduced the reported unsupported-claim failure; after targeted correction diagnostics and clearer evidence instructions, the same case returned validated feedback. Strict checks remain enabled, with no silent claim downgrades or extra retries. The UI now distinguishes unsupported job matches from unverified numbers. See [job-specific claim recovery](docs/ai-integration.md#job-specific-claim-recovery-2026-11-06).
+
+Earlier controlled-improvement quality gate: **526 unit/integration tests**, **80 desktop/mobile browser/API tests**, lint, strict types, and production build passed. Both modes cover actual upload through controlled editing using validated mocked reviews. Desktop/mobile development-app screenshots were also inspected. A separate fresh live synthetic Gemini attempt returned `PROVIDER_ERROR` before reaching improvement; it was not retried or counted as live success. See [controlled-improvement verification](docs/resume-improvement.md#verification).
+
+Earlier validation-recovery quality gate: **482 unit/integration tests**, **68 desktop/mobile browser/API tests**, lint, strict types, and production build passed. Invalid Gemini output remains rejected; additional structural/evidence failures now qualify for the existing single correction attempt, and the UI displays safe failure categories without document contents.
 
 Dashboard milestone quality gate: **460 unit/integration tests**, **66 desktop/mobile browser/API tests**, lint, strict TypeScript, and production build passed. Both modes were tested from real PDF/DOCX upload through dashboard with semantically validated mocked feedback. A live synthetic DOCX → Gemini → job-specific dashboard run also passed; fresh general-mode live attempts returned `INVALID_RESPONSE` and `PROVIDER_ERROR`, with no feedback displayed. Those failed attempts remain recorded as failures. A subsequent recovery fix added missing correction eligibility and safe validation reasons; a fresh real PDF → Gemini → general dashboard run then passed. See [validation-error recovery](docs/ai-integration.md#validation-error-recovery-and-safe-diagnostics). Desktop/mobile screenshots were inspected. The last dependency audit remains zero runtime findings and thirteen documented tooling entries; no dependencies changed. These checks do not establish real-user privacy compliance or hallucination-free analysis.
 
+- [Controlled improvement, patch safety, draft lifetime, and limits](docs/resume-improvement.md)
+- [Concise chronological human prompt log](CHAT_LOG.md)
 - [Results dashboard, job extraction, matching methodology, and limits](docs/results-dashboard.md)
 - [AI integration, official sources, security/privacy limits, and verification](docs/ai-integration.md)
 - [Deterministic analysis API and thresholds](docs/deterministic-analysis.md)

@@ -1,5 +1,6 @@
 import { AREAS, reviewSchema, rewriteSchema, type AiReview, type Rewrite } from "../../lib/ai-review/contracts.ts";
 import { invalidResponse } from "./errors.ts";
+import { encodeClaimProblems, type ClaimProblem } from "./claim-diagnostics.ts";
 
 const normalized = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}+#]+/gu, " ").trim();
 function exactQuotes(quotes: string[], source: string) {
@@ -29,7 +30,8 @@ export function validateReview(input: unknown, resume: string, job?: string): Ai
   // A sparse description may contain no assessable requirements. Do not force
   // invented matches; the job inventory will retain extracted items as unassessed.
   if (!job && data.jobMatches.length) throw invalidResponse("unexpected-job-matches");
-  for (const match of data.jobMatches) {
+  const claimProblems: ClaimProblem[] = [];
+  for (const [index, match] of data.jobMatches.entries()) {
     exactQuotes([match.jobEvidence], job ?? ""); exactQuotes(match.resumeEvidence, resume);
     if (!normalized(match.jobEvidence).includes(normalized(match.requirement))) throw invalidResponse("requirement-not-in-job-evidence");
     if (match.status === "supported") {
@@ -37,7 +39,7 @@ export function validateReview(input: unknown, resume: string, job?: string): Ai
       // Every substantive term still needs literal lexical evidence; no inferred skills.
       const terms = normalized(match.requirement).split(" ").filter(term => !["and", "or", "the", "a", "an", "with", "in", "of", "for", "to"].includes(term));
       const supplied = ` ${normalized(match.resumeEvidence.join(" "))} `;
-      if (!terms.length || terms.some(term => !supplied.includes(` ${term} `))) throw invalidResponse("unsupported-requirement-claim");
+      if (!terms.length || terms.some(term => !supplied.includes(` ${term} `))) claimProblems.push({ reason: "unsupported-requirement-claim", path: `jobMatches.${index}.status` });
     }
     if (match.status === "partially_supported" && !match.resumeEvidence.length) throw invalidResponse("missing-partial-evidence");
     if (match.status === "not_evidenced" && match.resumeEvidence.length) throw invalidResponse("conflicting-match-evidence");
@@ -45,7 +47,18 @@ export function validateReview(input: unknown, resume: string, job?: string): Ai
   // Reject introduced numbers throughout generated assessment/recommendation prose.
   // Numbers in exact job quotes are not candidate achievements; rewrites are checked against their own original.
   const suppliedNumbers = new Set((resume + "\n" + (job ?? "")).match(/\d+(?:[.,]\d+)*(?:%|\+)?/gu) ?? []);
-  const prose = [data.assessment, ...data.priorities.flatMap(x => [x.title, x.recommendation]), ...data.strengths.flatMap(x => [x.title, x.explanation]), ...data.areas.map(x => x.explanation), ...data.findings.flatMap(x => [x.issue, x.whyItMatters, x.recommendation]), ...data.jobMatches.flatMap(x => [x.explanation, x.recommendation]), ...data.limitations].join("\n");
-  if ((prose.match(/\d+(?:[.,]\d+)*(?:%|\+)?/gu) ?? []).some(number => !suppliedNumbers.has(number))) throw invalidResponse("introduced-number");
+  const prose: { path: string; text: string }[] = [
+    { path: "assessment", text: data.assessment },
+    ...data.priorities.flatMap((x, i) => [{ path: `priorities.${i}.title`, text: x.title }, { path: `priorities.${i}.recommendation`, text: x.recommendation }]),
+    ...data.strengths.flatMap((x, i) => [{ path: `strengths.${i}.title`, text: x.title }, { path: `strengths.${i}.explanation`, text: x.explanation }]),
+    ...data.areas.map((x, i) => ({ path: `areas.${i}.explanation`, text: x.explanation })),
+    ...data.findings.flatMap((x, i) => [{ path: `findings.${i}.issue`, text: x.issue }, { path: `findings.${i}.whyItMatters`, text: x.whyItMatters }, { path: `findings.${i}.recommendation`, text: x.recommendation }]),
+    ...data.jobMatches.flatMap((x, i) => [{ path: `jobMatches.${i}.explanation`, text: x.explanation }, { path: `jobMatches.${i}.recommendation`, text: x.recommendation }]),
+    ...data.limitations.map((text, i) => ({ path: `limitations.${i}`, text })),
+  ];
+  for (const field of prose) {
+    if ((field.text.match(/\d+(?:[.,]\d+)*(?:%|\+)?/gu) ?? []).some(number => !suppliedNumbers.has(number))) claimProblems.push({ reason: "introduced-number", path: field.path });
+  }
+  if (claimProblems.length) throw invalidResponse(encodeClaimProblems(claimProblems));
   return data;
 }
