@@ -1,5 +1,5 @@
 import type { AiReview } from "../src/lib/ai-review/contracts.ts";
-import { hasUnsupportedCandidateFact, mentionedTechnologies, proseGroundingProblems, reviewProse } from "../src/server/ai/grounding.ts";
+import { hasUnsupportedCandidateFact, mentionedTechnologies, proseGroundingProblems, reviewProse } from "../src/lib/ai-review/grounding.ts";
 import { validateReview } from "../src/server/ai/validate.ts";
 import type { AiEvaluationCase } from "../tests/fixtures/ai-evaluation.ts";
 import type { ResumeAiProvider } from "../src/server/ai/provider.ts";
