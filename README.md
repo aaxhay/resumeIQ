@@ -1,6 +1,6 @@
 # ResumeIQ
 
-An AI-powered resume review platform in development. **Upload, extraction, and editable text confirmation are implemented.** Upload a PDF/DOCX or paste your resume, choose a review focus, inspect and correct the text, then confirm it. AI analysis, feedback, improvements, and export are not implemented.
+An AI-powered resume review platform in development. **Upload, extraction, editable text confirmation, and deterministic text checks are implemented.** Upload a PDF/DOCX or paste your resume, choose a review focus, inspect and correct the text, confirm it, then explicitly run explainable checks. AI analysis, job-description matching, generated improvements, and export are not implemented.
 
 ## Product target
 
@@ -19,7 +19,7 @@ npm ci
 npm run dev
 ```
 
-Open **http://localhost:3000** for the landing page, or **http://localhost:3000/review** for the workflow. Choose a PDF/DOCX up to **5 MiB**, or paste text. Select a review mode and choose **Extract resume text** / **Prepare pasted text**. Inspect and edit the result, then **Confirm resume text**. Job-specific mode requires 50–10,000 characters of job-description text, which stays in the browser. Extraction sends the resume to this application's server for in-memory processing, without AI or application storage. Use `Ctrl+C` to stop the server.
+Open **http://localhost:3000** for the landing page, or **http://localhost:3000/review** for the workflow. Choose a PDF/DOCX up to **5 MiB**, or paste text. Select a review mode and choose **Extract resume text** / **Prepare pasted text**. Inspect and edit the result, then **Confirm resume text** and **Run text checks**. Checks run locally in the browser and show source evidence, objective observations, and optional suggestions—not a score or comprehensive assessment. Job-specific mode requires 50–10,000 characters of job-description text, which stays in the browser. Extraction sends the resume to this application's server for in-memory processing, without AI or application storage. Use `Ctrl+C` to stop the server.
 
 For a production run:
 
@@ -70,6 +70,7 @@ src/components/landing/   Landing sections, separate from page composition
 src/components/ui/        Customized shadcn button, card, textarea, notices
 src/features/review/      Upload/editor UI, async state, validation, mode definitions
 src/lib/resume/           Shared extraction contracts, limits, file screening
+src/lib/resume-analysis/  Pure deterministic analyzer, typed findings, evidence, rules
 src/server/resume-processing/ Bounded requests, isolated extraction, normalization
 src/lib/config/           Pure Zod configuration validator
 src/lib/contracts/       Reserved shared API contracts
@@ -92,6 +93,7 @@ Reserved boundaries contain explanatory README files, not fake implementations. 
 - [Dependency-ordered implementation checklist](docs/implementation-checklist.md)
 - [Compatibility checks, documentation sources, and audit notes](docs/dependencies.md)
 - [Extraction workflow, limits, privacy, and verification](docs/extraction.md)
+- [Deterministic analysis API, rule thresholds, caveats, and verification](docs/deterministic-analysis.md)
 - [Historical Phase 1 implementation and verification](docs/phase-1.md)
 - [Design system](docs/design-system.md)
 - [Historical foundation verification record](docs/verification.md)
@@ -100,9 +102,11 @@ Reserved boundaries contain explanatory README files, not fake implementations. 
 
 Implemented: responsive landing page, accessible upload/paste workflow, server byte/signature validation, bounded PDF/DOCX extraction in a killable process, structure-preserving normalization, completeness warnings, editable text confirmation, review modes/job-description validation, cancellation/reset and stale-response handling. No permanent application storage or resume logging.
 
-Not implemented: Gemini integration, feedback, improvements, DOCX export, authentication, persistence, OCR, or public deployment. Confirmation does not perform analysis or establish that the resume's facts are correct. Complex layouts may need manual correction.
+Also implemented: a standalone `analyzeResume(text, options)` TypeScript module with bounded, English-oriented structure, writing, achievement-context, and readability rules. Typed findings have stable IDs and exact source locations; absence checks never invent evidence. No metric is universally required. The UI runs checks only on explicit request after confirmation, supports evidence selection, and clears stale results when inputs change.
 
-Tests use synthetic documents and cover extraction failures as well as upload → inspect → edit → confirm. See `docs/extraction.md` for verification and limitations.
+Not implemented: Gemini integration, job-description matching, generated improvements, DOCX export, authentication, persistence, OCR, or public deployment. Confirmation alone does not run checks or establish factual accuracy. Heuristic findings are not a comprehensive review, ATS prediction, or score. Complex layouts may need manual correction.
+
+`npm run check` passed: lint, strict TypeScript, 266 unit/integration tests, production build, and 40 desktop/mobile browser/API tests. Fixtures are synthetic, including strong, poorly structured, repetitive, sparse, and unusually formatted resumes. See `docs/extraction.md` and `docs/deterministic-analysis.md` for verification and limitations.
 
 ## Next blockers and decisions
 
@@ -111,4 +115,4 @@ Tests use synthetic documents and cover extraction failures as well as upload �
 3. OS/container resource isolation and distributed upload rate limits before public release; provider consent/privacy and cost controls before AI integration.
 4. Resolve or deliberately accept the documented development-tooling advisories and ESLint compatibility exception.
 
-No existing files were overwritten during initialization: the directory was empty. No cloud resources were provisioned, and no Git commit or push was made.
+The initial directory was empty; no cloud resources were provisioned. Git phase commits and pushes follow the safeguards in `CLAUDE.md`; do not mistake implementation status for a successful push.

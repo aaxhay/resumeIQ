@@ -8,7 +8,9 @@ Build a reliable 1–2 day MVP for anyone improving a resume. Required modes:
 
 Required order: Upload Resume → Choose Review Mode → Confirm Extracted Text → Analyze → Review Feedback → Improve Resume → Export DOCX.
 
-Current authorized milestone is **resume upload, extraction, and editable text confirmation**. `/review` supports PDF/DOCX or pasted text, review modes, server extraction, completeness warnings, editing, confirmation, cancellation, and reset. Do not implement AI analysis, improvements, persistence, or export until requested. Do not add fake scores, seeded feedback, or controls that appear to perform unimplemented actions. Text confirmation is not analysis.
+Current authorized milestone is **deterministic resume text analysis**, following upload, extraction, and editable confirmation. `/review` supports PDF/DOCX or pasted text, review modes, server extraction, completeness warnings, editing, confirmation, explicit local text checks, evidence selection, cancellation, and reset. Do not implement AI analysis, job-description matching, generated improvements, persistence, or export until requested. Do not add fake scores, seeded feedback, or controls that appear to perform unimplemented actions. Confirmation alone does not run analysis.
+
+Keep `src/lib/resume-analysis` pure and independent of React, Next, providers, I/O, clocks, and randomness. Validate input/options; retain stable IDs and exact evidence offsets. Distinguish objective observations from optional stylistic suggestions. Never infer missing facts, require metrics in every bullet, or present heuristic thresholds as industry standards. Projects relevance must be explicit. Test rules independently before UI integration and invalidate findings on source/preferences changes. See `docs/deterministic-analysis.md` for the contract and limitations.
 
 ## Runtime and commands
 
@@ -39,6 +41,7 @@ Run production and development E2E sequentially (ports 3100 and 3101 respectivel
 - `src/components/ui`: shadcn/ui primitives (current base-nova / Base UI style). Preserve accessible semantics; do not assume Radix `asChild` APIs.
 - `src/features/review`: local setup UI in `components/`, state/race handling in `use-review-setup.ts`, pure validation in `validation.ts`, and shared mode descriptions in `review-options.ts`.
 - `src/lib/resume`: shared Zod extraction/confirmation schemas, limits, and file screening. No provider or database imports. `src/lib/contracts` remains reserved for later domains.
+- `src/lib/resume-analysis`: standalone `analyzeResume(text, options)` with strict input contracts, deterministic rule groups, exact evidence, and no scores, I/O, or framework dependency. The UI invokes this shared implementation rather than duplicating rules.
 - `src/lib/config`: pure configuration validation; never read secrets from a client module.
 - `src/server/config`: server-only environment access, validated when needed rather than at build time.
 - `src/server/ai`: future server-only Gemini adapter and response validation.

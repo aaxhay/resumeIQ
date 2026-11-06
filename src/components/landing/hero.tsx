@@ -40,7 +40,7 @@ export function Hero() {
         </ul>
         <div className="flex items-start gap-3 border-t border-primary/15 pt-5 text-xs leading-6 text-muted-foreground">
           <MoveUpRight aria-hidden="true" className="mt-1 size-4 shrink-0" />
-          <p>Upload, extract, and confirm your resume text now. AI feedback and export are not available yet.</p>
+          <p>Upload, confirm your text, and run explainable checks without scores. AI feedback and export are not available yet.</p>
         </div>
       </aside>
     </section>

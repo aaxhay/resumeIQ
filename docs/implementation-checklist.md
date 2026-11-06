@@ -30,7 +30,7 @@ The 1–2 day target prioritizes one trustworthy complete workflow over account/
 - [x] Exercise the live dev app and inspect desktop, tablet, and mobile screenshots.
 - [x] No new dependencies, server uploads, extraction, AI requests, or persistent storage added.
 
-## Current — Server upload, extraction, and text confirmation
+## Completed milestone — Server upload, extraction, and text confirmation
 
 Dependencies: foundation. Local full-project Node 24 execution; public deployment resource/packaging verification remains a release gate. See `extraction.md`.
 
@@ -41,14 +41,30 @@ Dependencies: foundation. Local full-project Node 24 execution; public deploymen
 - [x] Extract plain text; handle corrupt, protected, empty, and low-text/scanned documents as processing errors, with pasted-text fallback.
 - [x] Implement local mode selection; require job description only for job-specific mode (Phase 1 UI).
 - [ ] Enforce mode/job-description validation in the future analysis endpoint (not part of extraction; job descriptions are never sent to the extraction endpoint).
-- [x] Show editable extracted/pasted text and validate confirmation; no analysis action exists yet.
+- [x] Show editable extracted/pasted text and validate confirmation; analysis was not part of this extraction milestone.
 - [x] Add loading/error/empty/success states, keyboard/focus behavior, cancellation, and file replacement/reset.
 - [x] Test synthetic PDF/DOCX fixtures and rejection cases; E2E upload → mode → inspect → edit → confirm.
 - [x] Pass `npm run check`: lint, strict types, 112 unit/integration tests, production build, 34 desktop/mobile browser/API tests.
 - [x] Drive the actual dev app through PDF, DOCX, and pasted-text confirmation; inspect desktop/mobile/320px screenshots and verify narrow-layout overflow.
 - [x] Rerun runtime/full audits: zero runtime findings; unchanged 13 tooling findings (2 low, 11 moderate). No AI calls or permanent application storage.
 
-## Phase 2 — Analysis and feedback (day 1, next)
+## Current — Deterministic resume text analysis
+
+Dependencies: normalized text; no provider credentials. See `deterministic-analysis.md`.
+
+- [x] Expose standalone typed `analyzeResume(text, options)` independent of frontend/provider.
+- [x] Validate bounded normalized input/options; use stable IDs and exact evidence offsets.
+- [x] Implement structure/completeness, writing, achievement-context, and readability rule groups.
+- [x] Distinguish objective observations from optional suggestions; no scores, inferred facts, industry-standard claims, or blanket metric requirements.
+- [x] Require explicit relevance for projects presence; disclose English/parser/layout limitations and output cap.
+- [x] Test each rule independently and five synthetic resume fixtures; verify purity, determinism, boundaries, and evidence.
+- [x] Pass standalone tests/lint/types/Node execution before connecting UI.
+- [x] Add explicit post-confirmation browser-local checks, evidence selection, honest empty results, and stale-result invalidation.
+- [x] Pass `npm run check`: lint, strict types, 266 unit/integration tests, production build, 40 desktop/mobile browser/API tests.
+- [x] Drive the live development app at 1280px, 390px, and 320px; verify evidence selection/invalidation, no page errors/overflow, and inspect screenshots.
+- [x] Document API, thresholds, privacy, verification, and limitations; no new dependencies or provider calls.
+
+## Phase 2 — AI analysis and feedback (next)
 
 Dependencies: confirmed text; Gemini key, chosen model, quota/billing; consent copy.
 
