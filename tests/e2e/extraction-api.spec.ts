@@ -8,7 +8,7 @@ test("API validates direct requests without relying on browser screening", async
     { name: "resume.pdf", mimeType: "image/png", buffer: Buffer.from("%PDF-1.7"), code: "UNSUPPORTED_FORMAT", status: 415 },
     { name: "resume.pdf", mimeType: "application/pdf", buffer: Buffer.from("not a PDF"), code: "MALFORMED_FILE", status: 422 },
     { name: "resume.pdf", mimeType: "application/pdf", buffer: Buffer.alloc(0), code: "MALFORMED_FILE", status: 422 },
-    { name: "resume.pdf", mimeType: "application/pdf", buffer: Buffer.alloc(5 * 1024 * 1024 + 1), code: "FILE_TOO_LARGE", status: 413 },
+    { name: "resume.pdf", mimeType: "application/pdf", buffer: Buffer.alloc(4 * 1024 * 1024 + 1), code: "FILE_TOO_LARGE", status: 413 },
     { name: "resume.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", buffer: Buffer.from([80, 75, 3, 4, 0]), code: "MALFORMED_FILE", status: 422 },
   ];
   for (const { code, status, ...file } of cases) {

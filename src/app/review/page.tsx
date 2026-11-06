@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { ReviewExitLink } from "@/components/review-exit-link";
 import { ArrowLeft, LockKeyhole, ScanText } from "lucide-react";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Notice } from "@/components/ui/notice";
+import { MAX_FILE_LABEL } from "@/lib/resume/limits";
 import { ReviewSetupForm } from "@/features/review/components/review-setup-form";
 
 export const metadata: Metadata = {
@@ -16,7 +17,7 @@ export default function ReviewPage() {
     <>
       <SiteHeader reviewPage />
       <main id="main-content" tabIndex={-1} className="page-container py-10 sm:py-14">
-        <Link href="/" className="mb-8 inline-flex items-center gap-2 rounded-sm text-sm text-muted-foreground hover:text-primary"><ArrowLeft aria-hidden="true" className="size-4" /> Back to overview</Link>
+        <ReviewExitLink href="/" className="mb-8 inline-flex items-center gap-2 rounded-sm text-sm text-muted-foreground hover:text-primary"><ArrowLeft aria-hidden="true" className="size-4" /> Back to overview</ReviewExitLink>
         <div className="mb-8 max-w-2xl">
           <p className="eyebrow mb-3">Let’s start with your story</p>
           <h1 className="text-3xl leading-tight font-semibold tracking-tight sm:text-4xl">Set up your resume review.</h1>
@@ -35,18 +36,18 @@ export default function ReviewPage() {
               <p className="mt-3 text-sm leading-7 text-muted-foreground">Files and pasted text go to this application’s server only when you request extraction. They are processed in memory, without application file storage or AI requests.</p>
               <p className="mt-3 text-sm leading-7 text-muted-foreground">Edits and job descriptions stay in this page’s memory until you request another action. Gemini review sends only your reviewed previews to Google with consent. DOCX export sends the improved resume to this application’s server, not Google. Use Start over or reload to clear the page; this cannot undo a provider transfer or delete a downloaded file.</p>
               <p className="mt-3 text-sm leading-7 text-muted-foreground">Optional account history saves only a separately previewed and consented summary with limited excerpts for up to 30 days. It does not store your draft. Delete saved summaries from Account; reloading does not delete them.</p>
-              <Link href="/#privacy" className="mt-4 inline-block rounded-sm text-sm font-medium text-primary underline underline-offset-4">About your privacy</Link>
+              <ReviewExitLink href="/#privacy" className="mt-4 inline-block rounded-sm text-sm font-medium text-primary underline underline-offset-4">About your privacy</ReviewExitLink>
             </section>
             <section className="px-1">
               <ScanText aria-hidden="true" className="mb-3 size-5 text-muted-foreground" />
               <h2 className="text-sm font-semibold">Check before you confirm</h2>
               <p className="mt-2 text-sm leading-7 text-muted-foreground">Compare headings, dates, bullets, and section order with your original. Complex columns or tables may need correction. Extraction warnings are not resume scores.</p>
-              <p className="mt-3 text-xs leading-6 text-muted-foreground">Use a text-based PDF (up to 20 pages) or DOCX, up to 5 MB. OCR is not available. For scanned, protected, or damaged files, paste your text instead.</p>
+              <p className="mt-3 text-xs leading-6 text-muted-foreground">Use a text-based PDF (up to 20 pages) or DOCX, up to {MAX_FILE_LABEL}. OCR is not available. For scanned, protected, or damaged files, paste your text instead.</p>
             </section>
           </aside>
         </div>
       </main>
-      <SiteFooter />
+      <SiteFooter reviewPage />
     </>
   );
 }

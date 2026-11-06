@@ -1,5 +1,6 @@
-export const MAX_FILE_BYTES = 5 * 1024 * 1024;
-export const MAX_FILE_LABEL = "5 MB";
+/** Leave multipart overhead below Vercel's 4.5 MB function payload limit. */
+export const MAX_FILE_BYTES = 4 * 1024 * 1024;
+export const MAX_FILE_LABEL = "4 MB";
 export const MAX_RESUME_CHARACTERS = 80_000;
 export const MIN_RESUME_CHARACTERS = 40;
 export const MIN_RESUME_WORDS = 8;

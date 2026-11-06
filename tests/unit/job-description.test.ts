@@ -220,6 +220,12 @@ describe("conservative requirement extraction", () => {
     expect(extractJobDescription(text).requirements.every((entry) => entry.source === "explicit-wording")).toBe(true);
   });
 
+  it("does not promote explicit no-need wording to a required skill", () => {
+    expect(entries(job("Required skills:", "- No need for Kubernetes", "- No requirement for microservices", "- Python"))).toEqual([
+      { requirement: "Python", category: "required_skill" },
+    ]);
+  });
+
   it("does not split requirement prose at commas", () => {
     const text = job("Minimum requirements:", "- You must have experience with TypeScript, SQL, and Docker.", "Preferred: Experience with Kubernetes, Terraform");
     expect(entries(text)).toEqual([

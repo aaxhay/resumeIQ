@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const MAX_EXPORT_TEXT = 110_000;
 export const MAX_EXPORT_PARAGRAPHS = 4_000;
-export const MAX_EXPORT_BYTES = 5 * 1024 * 1024;
+/** Responses must also fit Vercel's 4.5 MB function payload limit. */
+export const MAX_EXPORT_BYTES = 4 * 1024 * 1024;
 export const DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 export const EXPORT_FILENAME = "improved-resume.docx";
 

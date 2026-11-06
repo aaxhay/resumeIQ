@@ -115,14 +115,24 @@ async function openWorkspace(page: Page) {
   await expect(workspace(page)).toBeFocused();
 }
 
-async function start(page: Page, options: { mode?: Mode; text?: string; findings?: Finding[]; providerOnly?: string; kind?: "pdf" | "docx" } = {}) {
+async function start(page: Page, options: { mode?: Mode; text?: string; findings?: Finding[]; providerOnly?: string; kind?: "pdf" | "docx"; fromLanding?: boolean; preferencesAfterConfirmation?: boolean } = {}) {
   const observed = await mockReviews(page, options.findings);
-  await page.goto("/review");
-  if (options.mode === "job-specific") {
+  await page.goto(options.fromLanding ? "/" : "/review");
+  if (options.fromLanding) await page.getByRole("link", { name: "Review My Resume", exact: true }).click();
+  if (options.mode === "job-specific" && !options.preferencesAfterConfirmation) {
     await page.getByRole("radio", { name: "Job-Specific Review", exact: true }).check();
     await page.getByRole("textbox", { name: "3. Add the job description" }).fill(dashboardJob);
   }
   const original = await uploadAndConfirm(page, options.text, options.kind);
+  if (options.preferencesAfterConfirmation) {
+    await page.getByRole("radio", { name: options.mode === "job-specific" ? "Job-Specific Review" : "General Review", exact: true }).check();
+    if (options.mode === "job-specific") {
+      await page.getByRole("textbox", { name: "3. Add the job description" }).fill(dashboardJob);
+      await expect(page.getByRole("heading", { name: "Resume text confirmed", exact: true })).toHaveCount(0);
+      // Changing preferences intentionally requires reconfirmation, not re-extraction.
+      await page.getByRole("button", { name: "Confirm resume text", exact: true }).click();
+    }
+  }
   expect(observed.requests).toHaveLength(0);
   if (options.providerOnly) await page.getByRole("textbox", { name: "Resume preview to send", exact: true }).fill(`${prepareAiText(original)}\n${options.providerOnly}`);
   await consentAndReview(page);
@@ -158,10 +168,21 @@ async function assertOriginal(page: Page, original: string) {
 
 for (const mode of ["general", "job-specific"] as const) {
   test(`${mode}: compare, safely accept, manually save, reject, undo and confirm restore`, async ({ page }, testInfo) => {
-    const { original, requests, errors } = await start(page, { mode, kind: mode === "general" ? "pdf" : "docx" });
+    const { original, requests, errors } = await start(page, { mode, kind: mode === "general" ? "pdf" : "docx", fromLanding: true, preferencesAfterConfirmation: true });
     expect(requests[0]!.mode).toBe(mode);
     if (mode === "general") expect(requests[0]).not.toHaveProperty("jobDescription");
-    else expect(requests[0]).toHaveProperty("jobDescription", dashboardJob);
+    else {
+      expect(requests[0]).toHaveProperty("jobDescription", dashboardJob);
+      const comparison = page.getByRole("region", { name: "Job evidence comparison", exact: true });
+      await comparison.locator("summary").filter({ hasText: "Required and preferred coverage" }).click();
+      const requirement = comparison.locator("summary").filter({ hasText: "accessible tools" }).first();
+      await requirement.click();
+      const evidenceCard = requirement.locator("..");
+      await expect(evidenceCard.getByText("Job description preview evidence · exact text", { exact: true })).toBeVisible();
+      await expect(evidenceCard.getByText("- accessible tools", { exact: true })).toBeVisible();
+      await expect(evidenceCard.getByText("Resume preview evidence · exact text", { exact: true })).toBeVisible();
+      await expect(evidenceCard.getByText(safeOriginal, { exact: true })).toBeVisible();
+    }
     const safe = card(page, "safe");
     await expect(safe.getByRole("heading", { name: "Original text", exact: true })).toBeVisible();
     await expect(safe.getByRole("heading", { name: "Original text", exact: true }).locator("..").getByText(safeOriginal, { exact: true })).toBeVisible();
@@ -290,6 +311,30 @@ test("download completion preserves local work through back, forward and return,
   expect(persistenceRequests).toEqual([]);
   expect(requests).toHaveLength(1);
   expect(errors).toEqual([]);
+});
+
+test("same-tab navigation warns before discarding accepted edits and unsaved wording", async ({ page }) => {
+  const { original } = await start(page);
+  await accept(card(page, "safe")).click();
+  await card(page, "manual").getByRole("button", { name: "Edit wording" }).click();
+  const buffer = card(page, "manual").getByRole("textbox", { name: "Edit suggested text" });
+  await buffer.fill("Unsaved navigation regression wording");
+  for (const name of ["ResumeIQ home", "Back to overview", "About your privacy", "How this preview handles your data"]) {
+    const prompt = page.waitForEvent("dialog", { timeout: 3_000 });
+    const navigation = page.getByRole("link", { name, exact: true }).click({ noWaitAfter: true });
+    const dialog = await prompt;
+    expect(dialog.type()).toBe("beforeunload");
+    await dialog.dismiss();
+    await navigation;
+    await expect(page).toHaveURL(/\/review$/u);
+    await expect(preview(page)).toHaveValue(original.replace(safeOriginal, safeRevised));
+    await expect(buffer).toHaveValue("Unsaved navigation regression wording");
+  }
+  page.once("dialog", dialog => { void dialog.accept(); });
+  await page.getByRole("link", { name: "Back to overview", exact: true }).click();
+  await expect(page).toHaveURL(/\/$/u);
+  await page.getByRole("link", { name: "Review My Resume", exact: true }).click();
+  await expect(workspace(page)).toHaveCount(0);
 });
 
 test("a fresh completion fragment cannot fabricate a successful download", async ({ page }) => {

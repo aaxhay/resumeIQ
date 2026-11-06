@@ -38,7 +38,7 @@ const fieldLabels: Readonly<Record<string, "title" | "company">> = {
 };
 const qualificationCue = /\b(?:degree|diploma|bachelor(?:'s)?|master(?:'s)?|ph\.?d\.?|certification|certified|certificate|education)\b/i;
 const experienceCue = /\bexperience\b|\b\d+\+?\s+years?\b/i;
-const negativeCue = /\b(?:not required|not necessary|no .{0,60} required|optional|not preferred)\b/i;
+const negativeCue = /\b(?:not required|not necessary|no .{0,60} required|no (?:need|requirement) for|optional|not preferred)\b/i;
 const nonRequirementCue = /^(?:we (?:are|offer|provide|build|believe)\b|our\b|(?:the )?(?:company|employer|location|salary|compensation|benefits)\b|you (?:will )?(?:enjoy|receive|benefit)\b)/i;
 const excludedLabel = /^(?:about(?: us| the company| the role)?|skills|requirements|overview|summary|benefits|perks|salary|compensation|location|work location|employment type|job type|equal opportunity|how to apply|application process|our (?:team|culture|mission)|who we are)$/i;
 

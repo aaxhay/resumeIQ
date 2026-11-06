@@ -27,7 +27,7 @@ This is a fresh clean template, **not preservation of the original PDF/DOCX layo
 
 ## Boundary, validation, and limits
 
-- `src/lib/resume-export/contracts.ts`: strict `{text}` input and typed failure envelope. Maximum 110,000 UTF-16 characters (80,000 original plus up to twelve 2,500-character edits), 4,000 source lines including blanks, and 5 MiB output. XML 1.0-invalid characters and unpaired UTF-16 surrogates are rejected, not removed silently.
+- `src/lib/resume-export/contracts.ts`: strict `{text}` input and typed failure envelope. Maximum 110,000 UTF-16 characters (80,000 original plus up to twelve 2,500-character edits), 4,000 source lines including blanks, and 4 MiB output (below Vercel's 4.5 MB response ceiling). XML 1.0-invalid characters and unpaired UTF-16 surrogates are rejected, not removed silently.
 - `POST /api/resume/export`: Node-only, same-origin JSON, actual streamed body bound of `110000 * 6 + 1024` bytes, ten-second read timeout, fatal UTF-8 decoding, cancellation, and unknown-field rejection. The bounded JSON reader is shared with the AI endpoint without changing its input limits.
 - Two concurrent requests and twenty generation admissions per rolling minute per process. Limits reset with the process and are **not** authentication or distributed abuse prevention. A public deployment still needs trusted ingress/authentication, distributed controls, and platform resource limits.
 - `generateResumeDocx`: `Document`, `Paragraph`, `TextRun`, explicit numbering/styles, and asynchronous `Packer.toBuffer` from runtime `docx@9.15.2`. No filesystem, network, or model dependency in generation.

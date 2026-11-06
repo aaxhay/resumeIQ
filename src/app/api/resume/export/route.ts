@@ -4,6 +4,7 @@ import { ResumeExportError } from "@/server/documents/errors";
 import { JsonRequestError, readJsonRequest } from "@/server/http/json-request";
 
 export const runtime = "nodejs";
+export const maxDuration = 45;
 const headers = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 // Process-local resource bounds, not authentication or distributed abuse protection.
 let active = 0;

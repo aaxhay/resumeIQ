@@ -35,10 +35,10 @@ export function ResumeUpload({ file, checking, error, inputRef, onSelect, onRemo
         onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }}
         onDragLeave={(event) => { event.preventDefault(); dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDragging(false); }}
         onDrop={(event) => { event.preventDefault(); setDragging(false); dragDepth.current = 0; onSelect(Array.from(event.dataTransfer.files)); }}
-        className={cn("rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors sm:px-6", dragging ? "border-primary bg-accent" : "border-input bg-background hover:border-primary/60", error && "border-destructive/60")}
+        className={cn("rounded-2xl border-2 border-dashed px-4 py-8 text-center transition-colors sm:px-6 sm:py-10", dragging ? "border-primary bg-accent" : "border-input bg-background hover:border-primary/60 hover:bg-accent/30", error && "border-destructive/60")}
       >
-        {checking ? <LoaderCircle aria-hidden="true" className="mx-auto mb-4 size-7 animate-spin text-primary motion-reduce:animate-none" /> : <UploadCloud aria-hidden="true" className="mx-auto mb-4 size-7 text-primary" />}
-        <p className="font-medium">{checking ? "Checking your file…" : dragging ? "Drop your resume here" : file ? "Want to use a different resume?" : "Drop your resume here"}</p>
+        <span className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl border border-primary/10 bg-card text-primary shadow-xs">{checking ? <LoaderCircle aria-hidden="true" className="size-7 animate-spin motion-reduce:animate-none" /> : <UploadCloud aria-hidden="true" className="size-7" />}</span>
+        <p className="font-semibold">{checking ? "Checking your file…" : dragging ? "Drop your resume here" : file ? "Want to use a different resume?" : "Drop your resume here"}</p>
         <p className="mt-1 text-sm text-muted-foreground">or choose a file from your device</p>
         <label className={cn(buttonVariants({ variant: "outline" }), "relative mt-5 cursor-pointer focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-ring", checking && "cursor-wait opacity-60")}>
           <input

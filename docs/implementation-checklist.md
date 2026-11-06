@@ -141,8 +141,34 @@ See [Supabase setup and security](supabase.md).
 - [x] Add same-document DOCX completion, return to the preserved draft, account history in a new tab, and confirmed local reset; never automatically persist a summary.
 - [x] Verify the running development app with synthetic upload, mocked AI, real export/download/text roundtrip, accepted/saved/unsaved draft preservation, browser back/forward, explicit retry, keyboard focus, and reset confirmation. Inspect desktop/320px screenshots; fix the narrow-screen reset-button overflow found by the first run.
 - [x] Scan 44 changed/new files, 39 staged blobs, and 14 production browser assets: zero configured-value matches; preserve the user's index and ignored local configuration.
-- [ ] Finish the rebuilt full quality gate for this follow-up.
+- [x] Finish the rebuilt full quality gate for this follow-up: 730 unit/integration tests, 130 desktop/mobile browser/API tests, lint, strict types, and production build. This is the pre-QA baseline; see [independent QA](qa-security-review.md) for subsequent fixes and verification.
 - [ ] Hosted SQL, retention scheduling, and live authenticated save/list/delete remain pending operator setup above.
+
+## Independent QA and security review (2026-11-07)
+
+See [full report](qa-security-review.md).
+
+- [x] Inspect implementation before editing; reproduce concrete AI, parser, account/history and navigation defects.
+- [x] Correct bounded AI token/prose/numeric checks, DOCX completeness warnings/rejection, stalled upload cancellation, account consent/readiness/quota/size handling, and same-tab review exit warnings.
+- [x] Pass final rebuilt `npm run check`: 818 unit/integration tests in 24 files, 150 desktop/mobile browser/API tests, lint, strict TypeScript, production build.
+- [x] Execute nine synthetic cases once against configured Gemini; report **8/9 fixture checks passed and one weak-resume `INVALID_RESPONSE` failure**, not a successful live suite. No harness reruns.
+- [x] Inspect desktop/mobile outage screenshots; post-build configured-value scan found zero matches in 47 changed/new files and 14 browser assets; whitespace checks passed.
+- [ ] Resolve live weak-resume reliability failure without weakening validation; universal factuality/semantic quality remains unestablished.
+- [ ] Complete hosted setup and deployment/security release requirements below. No public deployment approval is implied.
+
+## Vercel demonstration and UI polish (2026-11-07; in progress)
+
+See [deployment runbook](deployment.md) and [presenter script](demo-script.md). A running, verified hosted product is the requested deliverable; preparation alone does not complete this milestone.
+
+- [x] Read the supplied UI design guidance and polish existing typography, hierarchy, surfaces, spacing, focus, and touch targets without new product features or fake results.
+- [x] Align upload/multipart and DOCX output bounds with Vercel's 4.5 MB payload ceiling using a conservative 4 MiB cap.
+- [x] Configure Node route durations, cancellation opt-in, and explicit isolated-worker dependency/source tracing; add packaging regression tests and a projectless traced-worker smoke command.
+- [x] Document environment variables, secret exclusions, local setup, tests, protected deployment, limitations, and the complete synthetic demo journey.
+- [x] Drive actual development-app desktop/390px/320px upload, confirmation, and local checks with no page errors or horizontal overflow.
+- [x] Complete the rebuilt preparation gate: 824 unit/integration tests, 150 production browser/API tests, lint/types/build; projectless pasted/PDF/DOCX worker smoke (106 MiB Windows trace); zero configured-value matches in the post-build scan. These results precede the dark-theme follow-up.
+- [ ] Authenticate Vercel, link the intended project, configure scoped environment and verified deployment protection.
+- [ ] Deploy and record the real URL; verify hosted PDF/DOCX/paste, both live review modes, evidence/editing/export, errors/cancellation/mobile, and secret boundaries.
+- [ ] Keep unrestricted public production blocked until operational/privacy/abuse controls are verified.
 
 ## Phase 4 — Release hardening (day 2, remaining)
 

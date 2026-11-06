@@ -18,7 +18,7 @@ const id = "11111111-1111-4111-8111-111111111111";
 const user = { id: "22222222-2222-4222-8222-222222222222", email: "fictional@example.test", email_confirmed_at: "2026-11-06T00:00:00Z", is_anonymous: false };
 const publicKey = "sb_publishable_syntheticOnly123456789";
 const config = { NEXT_PUBLIC_SUPABASE_URL: "https://synthetic.supabase.co", NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: publicKey };
-const payload = () => ({ id, consent: true, review_mode: "general", resume_filename: null, ...reviewSummary(validAiReview()) });
+const payload = () => ({ id, consent: true, expected_account_email: user.email, review_mode: "general", resume_filename: null, ...reviewSummary(validAiReview()) });
 const record = () => ({ id, review_mode: "general", resume_filename: null, analysis_result: payload().analysis_result, created_at: new Date().toISOString(), resume_suggestions: [] });
 const request = (path: string, body: unknown, method = "POST", origin = "http://localhost:3100") => new Request(`http://localhost:3100${path}`, { method, headers: { Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify(body) });
 let account: typeof import("@/app/api/account/route");
@@ -120,6 +120,14 @@ describe("server-only optional authentication", () => {
     expect(mock.query.limit).toHaveBeenCalledExactlyOnceWith(0);
     expect(mock.client.rpc).not.toHaveBeenCalled();
   });
+  it("preserves sign-out identity when the history readiness request throws", async () => {
+    mock.query.limit.mockRejectedValue(new Error("PRIVATE_DETAIL"));
+    const response = await account.GET();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, configured: true, historyEnabled: false, historyUnavailable: true, user: { email: user.email } });
+    expect((await account.POST(request("/api/account", { action: "sign-out" }))).status).toBe(200);
+    expect(mock.auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
+  });
   it("does not probe history when disabled, while retaining verified identity", async () => {
     vi.stubEnv("SUPABASE_HISTORY_ENABLED", "false");
     expect(await (await account.GET()).json()).toEqual({ ok: true, configured: true, historyEnabled: false, user: { email: user.email } });
@@ -156,6 +164,15 @@ describe("server-only optional authentication", () => {
   it("rejects cross-origin auth changes", async () => {
     await failure(await account.POST(request("/api/account", { action: "sign-out" }, "POST", "https://foreign.invalid")), 403, "INVALID_REQUEST");
     expect(mock.auth.signOut).not.toHaveBeenCalled();
+  });
+  it("does not spend authentication allowance on rejected origins or schemas", async () => {
+    for (let index = 0; index < 12; index++) {
+      await failure(await account.POST(request("/api/account", { action: "sign-out" }, "POST", "https://foreign.invalid")), 403, "INVALID_REQUEST");
+      await failure(await account.POST(request("/api/account", { action: "not-an-action" })), 400, "INVALID_REQUEST");
+    }
+    expect(mock.create).not.toHaveBeenCalled();
+    expect((await account.POST(request("/api/account", { action: "sign-out" }))).status).toBe(200);
+    expect(mock.auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
   });
   it("does not expose provider auth errors", async () => {
     mock.auth.signInWithPassword.mockResolvedValue({ data: {}, error: new Error("PRIVATE_DETAIL") });
@@ -203,6 +220,31 @@ describe("saved summary server routes", () => {
     expect(await (await history.POST(request("/api/review-history", payload()))).json()).toEqual({ ok: true, id });
     expect(mock.auth.getUser).toHaveBeenCalledOnce();
     expect(mock.client.rpc).toHaveBeenCalledExactlyOnceWith("save_resume_review", { p_id: id, p_review_mode: "general", p_resume_filename: null, p_analysis_result: payload().analysis_result, p_suggestions: [] });
+  });
+  it("rejects save consent for a different account before invoking storage", async () => {
+    await failure(await history.POST(request("/api/review-history", { ...payload(), expected_account_email: "other-synthetic@example.test" })), 409, "ACCOUNT_CHANGED");
+    expect(mock.auth.getUser).toHaveBeenCalledOnce();
+    expect(mock.client.rpc).not.toHaveBeenCalled();
+  });
+  it("requires the expected account binding rather than accepting an unbound save", async () => {
+    const { expected_account_email: omitted, ...unbound } = payload();
+    expect(omitted).toBe(user.email);
+    await failure(await history.POST(request("/api/review-history", unbound)), 400, "INVALID_REQUEST");
+    expect(mock.client.rpc).not.toHaveBeenCalled();
+  });
+  it("reports the known review quota distinctly without leaking database diagnostics", async () => {
+    const { historyStorageError } = await import("@/server/supabase/errors");
+    const quota = { code: "23514", message: "Saved review limit reached", details: "PRIVATE_DETAIL" };
+    expect(historyStorageError(quota)).toMatchObject({ code: "REVIEW_LIMIT", status: 409 });
+    mock.client.rpc.mockResolvedValue({ data: null, error: quota });
+    await failure(await history.POST(request("/api/review-history", payload())), 409, "REVIEW_LIMIT");
+  });
+  it.each([
+    { code: "23514", message: "Unrelated constraint PRIVATE_DETAIL" },
+    { code: "UNKNOWN", message: "Saved review limit reached" },
+  ])("does not mistake other database errors for the review quota: %j", async error => {
+    mock.client.rpc.mockResolvedValue({ data: null, error });
+    await failure(await history.POST(request("/api/review-history", payload())), 503, "STORAGE_ERROR");
   });
   it("rejects forged ownership before database access", async () => {
     await failure(await history.POST(request("/api/review-history", { ...payload(), user_id: user.id })), 400, "INVALID_REQUEST");
@@ -259,7 +301,9 @@ describe("saved summary server routes", () => {
     mock.query.limit.mockResolvedValue(result);
     mock.client.rpc.mockResolvedValue(result);
     mock.query.maybeSingle.mockResolvedValue(result);
-    await failure(await account.GET(), 503, "STORAGE_ERROR");
+    const accountResponse = await account.GET();
+    expect(accountResponse.status).toBe(200);
+    expect(await accountResponse.json()).toEqual({ ok: true, configured: true, historyEnabled: false, historyUnavailable: true, user: { email: user.email } });
     await failure(await history.GET(), 503, "STORAGE_ERROR");
     await failure(await history.POST(request("/api/review-history", payload())), 503, "STORAGE_ERROR");
     await failure(await deletion.DELETE(request(`/api/review-history/${id}`, {}, "DELETE"), { params: Promise.resolve({ id }) }), 503, "STORAGE_ERROR");

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build",
+  "functions": {
+    "src/app/api/resume/extract/route.ts": { "supportsCancellation": true },
+    "src/app/api/resume/export/route.ts": { "supportsCancellation": true },
+    "src/app/api/reviews/route.ts": { "supportsCancellation": true }
+  }
+}

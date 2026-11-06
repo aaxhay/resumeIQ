@@ -3,6 +3,8 @@ import { errorStatus, safeFailure, ResumeProcessingError } from "@/server/resume
 import { runWorker } from "@/server/resume-processing/run-worker";
 
 export const runtime = "nodejs";
+// Upload read (15s) + isolated parsing (15s), with platform overhead.
+export const maxDuration = 45;
 const headers = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 let inFlight = 0;
 

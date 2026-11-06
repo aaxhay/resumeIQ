@@ -38,7 +38,7 @@ describe("shared export contracts", () => {
     expect(EXPORT_FILENAME).toBe("improved-resume.docx");
     expect(DOCX_CONTENT_TYPE).toBe("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     expect(MAX_EXPORT_TEXT).toBe(80_000 + 12 * 2_500);
-    expect(MAX_EXPORT_BYTES).toBe(5 * 1024 * 1024);
+    expect(MAX_EXPORT_BYTES).toBe(4 * 1024 * 1024);
     expect(MAX_EXPORT_PARAGRAPHS).toBeGreaterThanOrEqual(2_000);
     expect(exportRequestSchema.parse({ text: "  Current text  " })).toEqual({ text: "  Current text  " });
   });

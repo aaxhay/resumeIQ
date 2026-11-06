@@ -6,6 +6,8 @@ const messages: Record<HistoryErrorCode, string> = {
   HISTORY_DISABLED: "Saving is unavailable on this deployment. Your current review and local draft are unchanged.",
   HISTORY_NOT_READY: "Saved history requires database setup. The operator must apply the Supabase migration and configure retention using docs/supabase.md. Your review and draft are unchanged; retrying cannot fix missing tables.",
   UNAUTHORIZED: "Your session has expired. Private history has been cleared from this page. Sign in again to continue.",
+  ACCOUNT_CHANGED: "Your account changed before this summary could be saved. Nothing was saved by this request. Sign in to the intended account and give storage consent again.",
+  REVIEW_LIMIT: "Your account already has 20 saved summaries. Open Account and delete an existing summary before retrying this save. Your local review and draft are unchanged.",
   INVALID_REQUEST: "Check the form and consent before trying again. Nothing new was confirmed saved.",
   AUTH_FAILED: "We could not complete account access. Check your email and password, confirm your email if needed, then try again.",
   BUSY: "This service is busy. Wait a moment, then try again.",
@@ -18,7 +20,7 @@ export class AccountRequestError extends Error {
 export function requestError(error: unknown) {
   return error instanceof AccountRequestError ? error.message : "The request could not be confirmed. Check your connection and try again. A save may have completed; retrying the same save will not create a duplicate.";
 }
-export function unauthorized(error: unknown) { return error instanceof AccountRequestError && error.code === "UNAUTHORIZED"; }
+export function unauthorized(error: unknown) { return error instanceof AccountRequestError && (error.code === "UNAUTHORIZED" || error.code === "ACCOUNT_CHANGED"); }
 
 export async function accountRequest<T>(path: string, schema: z.ZodType<T>, signal: AbortSignal, method = "GET", body?: unknown): Promise<T> {
   const response = await fetch(path, {
