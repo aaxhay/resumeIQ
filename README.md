@@ -76,6 +76,8 @@ The rest of the application uses `ResumeAiProvider`, not Gemini SDK types. Model
 
 ## Documentation and verification
 
+Latest quality gate: **542 unit/integration tests**, **84 desktop/mobile browser/API tests**, lint, strict types, and production build passed.
+
 Job-specific claim recovery: a live synthetic composite job description reproduced the reported unsupported-claim failure; after targeted correction diagnostics and clearer evidence instructions, the same case returned validated feedback. Strict checks remain enabled, with no silent claim downgrades or extra retries. The UI now distinguishes unsupported job matches from unverified numbers. See [job-specific claim recovery](docs/ai-integration.md#job-specific-claim-recovery-2026-11-06).
 
 Earlier controlled-improvement quality gate: **526 unit/integration tests**, **80 desktop/mobile browser/API tests**, lint, strict types, and production build passed. Both modes cover actual upload through controlled editing using validated mocked reviews. Desktop/mobile development-app screenshots were also inspected. A separate fresh live synthetic Gemini attempt returned `PROVIDER_ERROR` before reaching improvement; it was not retried or counted as live success. See [controlled-improvement verification](docs/resume-improvement.md#verification).
