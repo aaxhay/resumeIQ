@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { ReviewExitLink } from "@/components/review-exit-link";
 import { ArrowRight, Check, FileText, MoveUpRight } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 
@@ -15,7 +15,7 @@ export function Hero() {
           review, or focus on a specific job. Start with local text checks, then choose optional Gemini feedback when configured.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
-          <Link href="/review" className={buttonVariants({ size: "lg", className: "hero-cta" })}>Review My Resume <ArrowRight aria-hidden="true" /></Link>
+          <ReviewExitLink href="/review" className={buttonVariants({ size: "lg", className: "hero-cta" })}>Review My Resume <ArrowRight aria-hidden="true" /></ReviewExitLink>
           <a href="#how-it-works" className="inline-flex min-h-11 items-center rounded-sm text-sm font-semibold underline-offset-4 transition-colors hover:text-primary hover:underline">See how it works</a>
         </div>
         <p className="mt-5 text-sm leading-6 text-muted-foreground">PDF, DOCX, or pasted text · No account needed</p>

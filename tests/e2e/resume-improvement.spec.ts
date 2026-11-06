@@ -28,10 +28,12 @@ async function downloadText(page: Page, stayOnCompletion = false) {
   await expect(page).toHaveURL(/\/review#download-complete$/u);
   await expect(page.getByRole("heading", { name: "Your DOCX download has started" })).toBeFocused();
   await expect(workspace(page)).toBeHidden();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   if (!stayOnCompletion) {
     await page.getByRole("button", { name: "Return to review", exact: true }).press("Enter");
     await expect(page).toHaveURL(/\/review$/u);
     await expect(workspace(page)).toBeVisible();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   }
   return text;
 }
@@ -85,6 +87,7 @@ async function mockReviews(page: Page, findings = defaultFindings()) {
 }
 
 async function uploadAndConfirm(page: Page, text = extendedResume, kind: "pdf" | "docx" = "docx") {
+  await expect(page.getByLabel("Choose resume file")).toBeEnabled();
   await page.getByLabel("Choose resume file").setInputFiles({
     name: `synthetic-improvement.${kind}`,
     mimeType: kind === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -119,6 +122,7 @@ async function start(page: Page, options: { mode?: Mode; text?: string; findings
   const observed = await mockReviews(page, options.findings);
   await page.goto(options.fromLanding ? "/" : "/review");
   if (options.fromLanding) await page.getByRole("link", { name: "Review My Resume", exact: true }).click();
+  await expect(page.getByText("Text extraction is ready.", { exact: true })).toHaveCount(0);
   if (options.mode === "job-specific" && !options.preferencesAfterConfirmation) {
     await page.getByRole("radio", { name: "Job-Specific Review", exact: true }).check();
     await page.getByRole("textbox", { name: "3. Add the job description" }).fill(dashboardJob);
@@ -288,6 +292,7 @@ test("download completion preserves local work through back, forward and return,
   await expect(buffer).toHaveValue("An unsaved local wording buffer");
   await page.goForward();
   await expect(completion).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   await completion.getByRole("button", { name: "Start another review", exact: true }).press("Enter");
   const reset = completion.getByRole("group", { name: "Confirm another review" });
   await expect(reset.getByRole("button", { name: "Discard local draft and start another review" })).toBeFocused();
@@ -311,6 +316,26 @@ test("download completion preserves local work through back, forward and return,
   expect(persistenceRequests).toEqual([]);
   expect(requests).toHaveLength(1);
   expect(errors).toEqual([]);
+});
+
+test("browser Back warns before leaving a review entered from the landing page", async ({ page }) => {
+  const { original } = await start(page, { fromLanding: true });
+  await accept(card(page, "safe")).click();
+  await card(page, "manual").getByRole("button", { name: "Edit wording" }).click();
+  const buffer = card(page, "manual").getByRole("textbox", { name: "Edit suggested text" });
+  await buffer.fill("Unsaved browser Back regression wording");
+  const prompt = page.waitForEvent("dialog", { timeout: 3_000 });
+  // Trigger the browser history action without waiting for a load we will cancel.
+  await page.evaluate(() => window.history.back());
+  const dialog = await prompt;
+  expect(dialog.type()).toBe("beforeunload");
+  await dialog.dismiss();
+  await expect(page).toHaveURL(/\/review$/u);
+  await expect(preview(page)).toHaveValue(original.replace(safeOriginal, safeRevised));
+  await expect(buffer).toHaveValue("Unsaved browser Back regression wording");
+  page.once("dialog", dialog => { void dialog.accept(); });
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/u);
 });
 
 test("same-tab navigation warns before discarding accepted edits and unsaved wording", async ({ page }) => {

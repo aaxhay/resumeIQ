@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { ReviewExitLink } from "@/components/review-exit-link";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { buttonVariants } from "@/components/ui/button";
@@ -20,7 +20,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         <p className="eyebrow">Optional · Your private summaries</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">A little history. On your terms.</h1>
         <p className="mt-4 text-base leading-7 text-muted-foreground">Your first review never needs an account. Sign in only if you want to save selected AI review summaries—not your resume or editing workspace.</p>
-        <Link href="/review" className={`${buttonVariants({ variant: "outline" })} mt-5 whitespace-normal`}>Start a review · no account needed</Link>
+        <ReviewExitLink href="/review" className={`${buttonVariants({ variant: "outline" })} mt-5 whitespace-normal`}>Start a review · no account needed</ReviewExitLink>
       </div>
       <div className="max-w-3xl"><AccountHistory confirmationFailed={params.auth === "failed"} /></div>
     </main>

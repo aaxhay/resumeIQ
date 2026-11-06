@@ -1,7 +1,7 @@
 import { accountActionResponseSchema, accountActionSchema, accountSchema } from "@/lib/saved-reviews/contracts";
 import { configuration, createSupabaseClient } from "@/server/supabase/client";
 import { AccountError, accountFailure, privateHeaders, historySetupMissing } from "@/server/supabase/errors";
-import { acquireAccountOperation } from "@/server/supabase/guard";
+import { acquireAccountOperation, acquireAccountSlot, consumeAccountAllowance } from "@/server/supabase/guard";
 import { JsonRequestError, readJsonRequest } from "@/server/http/json-request";
 
 export const runtime = "nodejs";
@@ -33,9 +33,10 @@ export async function GET(): Promise<Response> {
 export async function POST(request: Request): Promise<Response> {
   let release: (() => void) | undefined;
   try {
+    release = acquireAccountSlot();
     const parsed = accountActionSchema.safeParse(await readJsonRequest(request, 16_384));
     if (!parsed.success) throw new AccountError("INVALID_REQUEST", 400);
-    release = acquireAccountOperation("auth");
+    consumeAccountAllowance("auth");
     const client = await createSupabaseClient();
     const input = parsed.data;
     let confirmationRequired = false;
@@ -54,5 +55,8 @@ export async function POST(request: Request): Promise<Response> {
     }
     return Response.json(accountActionResponseSchema.parse({ ok: true, confirmationRequired }), { headers: privateHeaders });
   } catch (error) { return accountFailure(error instanceof JsonRequestError ? new AccountError("INVALID_REQUEST", error.status) : error); }
-  finally { release?.(); }
+  finally {
+    release?.();
+    if (request.body && !request.body.locked) void request.body.cancel().catch(() => undefined);
+  }
 }

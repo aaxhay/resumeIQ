@@ -35,6 +35,8 @@ No AI feedback is shown. Check the previews, then use Retry Gemini review to mak
 
 22. **Modern visual treatment (verbatim; 2026-11-07).** “add modern animations, 3d elements, modern typography and dark theme to make it look more attractive, behave like you are senior frontend engieer.” Preserve existing review behavior, accessibility, truthful content, and data-handling boundaries while improving the presentation.
 
+23. **Notice cleanup, download scrolling, independent review and debugging (summary; requested 2026-11-07).** Remove the long “Text extraction is ready” announcement and database-setup information box. After DOCX download, move to the top of the review page without requiring manual scrolling. Inspect before modifying code; independently review architecture, business logic, TypeScript, security, performance, error handling, duplication, abstractions, tests, and `CLAUDE.md` compliance, especially privacy, AI evidence, extraction, API security, and user isolation. Report prioritized findings with locations, impact, and fixes; repair critical/high issues first. Reproduce failures, establish actual root causes, make minimal safe corrections, add regressions, run relevant tests, and report exactly what changed and remains. Do not rewrite unrelated modules, weaken checks, suppress errors without justification, remove tests, substitute mocks for real functionality, or claim unreproduced issues are fixed.
+
 ## Standing implementation requirements
 
 - Strict TypeScript; no `any`; validate external inputs and use typed contracts.
