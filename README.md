@@ -2,7 +2,7 @@
 
 ResumeIQ helps people inspect resume text, understand evidence-backed feedback, and improve a separate draft before downloading an editable DOCX. It supports **General Review** and **Job-Specific Review**, with no account required for the core workflow. No ATS scores, hiring guarantees, invented results, or automatic edits.
 
-**Deployment status:** Vercel deployment is blocked awaiting operator login; no deployment URL or hosted success is established. The target is a **protected, synthetic-only demo**, not unrestricted public production. The new deployment packaging and limits still require verification. See [deployment instructions and release checks](docs/deployment.md) and the [presenter demo script](docs/demo-script.md).
+**Deployment status:** Vercel deployment is blocked awaiting operator login; no deployment URL or hosted success is established. The target is a **protected, synthetic-only demo**, not unrestricted public production. Local packaging and limits passed verification; Linux/Vercel behavior still requires hosted checks. See [deployment instructions and release checks](docs/deployment.md) and the [presenter demo script](docs/demo-script.md).
 
 ## Features
 
@@ -77,7 +77,9 @@ Install Chromium with `npx playwright install chromium` (Linux CI may need `--wi
 
 Ordinary tests mock provider/Auth boundaries while exercising real document extraction/export; embedded database tests do not verify hosted Supabase. A passing build or mocked journey is not live-model access, factuality, or deployment proof.
 
-**Historical QA baseline, not verification of the latest UI/deployment changes:** the 2026-11-07 full gate passed 818 unit/integration tests and 150 desktop/mobile browser/API tests, lint, strict types, and build. The separate live Gemini evaluation **failed overall: 8/9 synthetic cases passed fixture checks; the weak-resume case returned `INVALID_RESPONSE`**. That failure remains unresolved and was not rerun. Detailed evidence and earlier milestones remain in the [QA/security report](docs/qa-security-review.md) and feature documentation.
+**Latest local verification (2026-11-07):** the rebuilt full gate passed **838 unit/integration tests and 168 production desktop/mobile browser/API tests**, lint, strict types, and build. Projectless traced-worker checks passed paste/PDF/DOCX extraction on Windows. This includes dark theme/motion, notice cleanup, top-of-page download completion, retained drafts, browser-Back confirmation and evidence/authentication regressions. See the [final review and repair report](docs/final-review-followup.md) for fixes, intermediate failures and two remaining medium-priority AI false-rejection cases.
+
+The separate earlier live Gemini evaluation **failed overall: 8/9 synthetic cases passed fixture checks; the weak-resume case returned `INVALID_RESPONSE`**. That failure remains unresolved and was not rerun. These deterministic tests do not establish live-provider reliability or universal factuality. Earlier milestones remain in the [QA/security report](docs/qa-security-review.md).
 
 ## Vercel demo setup
 
@@ -90,7 +92,7 @@ These are operator steps, **not completed deployment claims**. Do not turn the d
 
 ## Limits and data handling
 
-- Deployment preparation targets **4 MiB uploads and a 4 MiB generated DOCX cap** (the UI labels upload size “4 MB”) to leave room below platform payload limits; final packaging/limit verification is pending. PDFs remain limited to 20 pages, extracted/editor text to 80,000 characters, Gemini resume previews to 30,000, and job descriptions to 50–10,000. No silent truncation.
+- Deployment preparation targets **4 MiB uploads and a 4 MiB generated DOCX cap** (the UI labels upload size “4 MB”) to leave room below platform payload limits; local checks passed, but hosted packaging/limit verification is pending. PDFs remain limited to 20 pages, extracted/editor text to 80,000 characters, Gemini resume previews to 30,000, and job descriptions to 50–10,000. No silent truncation.
 - No OCR, legacy `.doc`, PDF export, original-layout preservation, unrestricted generative rewriting, or factual/hiring-suitability certification. DOCX text in unsupported structures can require paste fallback.
 - Extraction sends input to this application's server for in-memory processing, not to Gemini. Only explicit AI consent sends the reviewed previews to Google. Export sends the improved text to this application's server, not Google.
 - Drafts live only in page memory. Download/copy before leaving; saved summaries cannot restore drafts. Reloading clears the workspace, not downloaded files, already transferred provider data, or saved summaries.
