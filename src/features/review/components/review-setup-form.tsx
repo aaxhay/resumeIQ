@@ -11,6 +11,7 @@ import { JobDescriptionField } from "./job-description-field";
 import { ResumeUpload } from "./resume-upload";
 import { ReviewModeSelect } from "./review-mode-select";
 import { SetupConfirmation } from "./setup-confirmation";
+import { DeterministicReview } from "./deterministic-review";
 
 export function ReviewSetupForm() {
   const setup = useReviewSetup();
@@ -96,6 +97,11 @@ export function ReviewSetupForm() {
         <Button type="button" onClick={confirm} className="mt-5" disabled={setup.confirmed}>Confirm resume text</Button>
         {setup.confirmed && <SetupConfirmation mode={setup.mode} panelRef={confirmation} />}
       </Card>}
+      {setup.confirmed && <DeterministicReview text={setup.editedText} onInspectEvidence={(start, end) => {
+        editor.current?.focus();
+        editor.current?.setSelectionRange(start, end);
+        editor.current?.scrollIntoView({ block: "center" });
+      }} />}
     </div>
   );
 }

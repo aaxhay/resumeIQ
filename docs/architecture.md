@@ -2,13 +2,14 @@
 
 ## One application, explicit boundaries
 
-Next.js App Router + strict TypeScript, Tailwind, and shadcn/ui. The session-only MVP needs no database. The current milestone implements upload → mode selection → extraction → editable text confirmation. Analysis, feedback, improvements, and export remain future work.
+Next.js App Router + strict TypeScript, Tailwind, and shadcn/ui. The session-only MVP needs no database. The current milestone implements upload → mode selection → extraction → editable text confirmation → explicit deterministic text checks. AI review, job-description matching, generated improvements, and export remain future work.
 
 ```text
 src/app/                         Server pages and thin Node route handlers
 src/components/ui/               Reusable accessible UI primitives
 src/features/review/             Client form, async state, validation, mode definitions
 src/lib/resume/                  Shared Zod contracts, limits, file screening
+src/lib/resume-analysis/         Pure deterministic rules, findings, evidence, parser
 src/lib/config/                  Pure environment validator
 src/server/resume-processing/    Bounded requests, validation, isolated parsers, normalization
 src/server/config/               Lazy server-only configuration
@@ -28,7 +29,10 @@ Import direction: UI/route → application processing → server adapter. Browse
 5. A typed, uncached response returns text, warnings, and statistics, or a safe error. Empty/scanned/insufficient text is a processing failure, never poor-resume feedback.
 6. The browser shows editable text. Confirmation validates the current edited text and preferences. Input changes invalidate confirmation; cancellation/reset ignore stale responses.
 
-See [extraction.md](extraction.md) for enforced bounds, parser details, limitations, and deployment requirements.
+7. After confirmation, an explicit **Run text checks** action calls `analyzeResume(text, options)` in the browser. It validates normalized text/options and returns typed observations/suggestions with stable IDs and exact evidence locations. No extra transmission, AI provider, score, or job-description matching.
+8. The UI groups findings, distinguishes objective observations from advice, and lets the user select evidence in the editor. Changing text/mode/job description clears confirmation and results. Explicit project relevance controls only the projects-presence check.
+
+The analyzer imports only browser-safe contracts/helpers and Zod; it can also run directly under Node 24 without Next. It does not depend on server adapters or the frontend. See [deterministic-analysis.md](deterministic-analysis.md) for rule thresholds, evidence conventions, limitations, and verification, and [extraction.md](extraction.md) for parser bounds and deployment requirements.
 
 ## API boundaries
 
@@ -48,4 +52,4 @@ Supabase remains deferred until an actual history/account requirement justifies 
 
 ## Release constraints
 
-Local Node 24 full-project execution is the supported path. Keep worker sources/shared modules and runtime dependencies available; do not assume standalone/serverless tracing packages them. No host is selected or tested. A V8 heap limit is not a native-memory/RSS limit, and child processes are not security sandboxes. Public release requires OS/container limits, upload/body/deadline settings, distributed abuse/rate controls, and deployment-specific verification. Provider credentials, model selection, quotas, and cost controls are still prerequisites for analysis.
+Local Node 24 full-project execution is the supported path. Keep worker sources/shared modules and runtime dependencies available; do not assume standalone/serverless tracing packages them. No host is selected or tested. A V8 heap limit is not a native-memory/RSS limit, and child processes are not security sandboxes. Public release requires OS/container limits, upload/body/deadline settings, distributed abuse/rate controls, and deployment-specific verification. Provider credentials, model selection, quotas, and cost controls are still prerequisites for future AI analysis, not for the implemented local deterministic checks.

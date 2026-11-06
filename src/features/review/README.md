@@ -1,6 +1,8 @@
 # Review workflow
 
-The client form supports upload or pasted text, mode/job-description setup, server extraction, editable confirmation, cancellation, and reset. AI analysis and export are not implemented.
+The client form supports upload or pasted text, mode/job-description setup, server extraction, editable confirmation, explicit deterministic text checks, evidence selection, cancellation, and reset. AI analysis, job-description matching, and export are not implemented.
+
+`components/deterministic-review.tsx` invokes the pure `src/lib/resume-analysis` module only after confirmation and an explicit Run text checks action. It makes no extra network request, shows objective observations separately from optional suggestions, and does not calculate scores. Projects relevance is opt-in. Input/preference changes invalidate confirmation and unmount results; changing project relevance clears results. Both review modes use the same general rules. See `docs/deterministic-analysis.md` for the API and rule limitations.
 
 - `validation.ts`: browser-safe setup schemas, shared file screening, display formatting.
 - `review-options.ts`: shared mode descriptions.
