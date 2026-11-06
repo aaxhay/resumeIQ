@@ -1,4 +1,4 @@
-import type { AiReview } from "./contracts.ts";
+import type { AiReview } from "../../lib/ai-review/contracts.ts";
 
 /** Pure source-text checks: no provider, configuration, credentials, I/O, or server dependencies.
  * Narrow lexical guards, NOT semantic entailment or a complete skill inventory. */

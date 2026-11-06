@@ -1,7 +1,7 @@
 import { AREAS, reviewSchema, rewriteSchema, type AiReview, type Rewrite } from "../../lib/ai-review/contracts.ts";
 import { invalidResponse } from "./errors.ts";
 import { encodeClaimProblems, type ClaimProblem } from "./claim-diagnostics.ts";
-import { affirmativeEvidence, containsInstruction, containsRequirementPhrase, evidenceContexts, literalEvidenceTerms, proseGroundingProblems, reviewProse } from "../../lib/ai-review/grounding.ts";
+import { affirmativeEvidence, containsInstruction, containsRequirementPhrase, evidenceContexts, literalEvidenceTerms, proseGroundingProblems, reviewProse } from "./grounding.ts";
 function exactQuotes(quotes: string[], source: string) {
   if (quotes.some(quote => !quote.trim() || !source.includes(quote))) throw invalidResponse("non-exact-evidence");
 }

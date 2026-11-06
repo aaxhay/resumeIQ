@@ -4,7 +4,7 @@ import { decodeClaimProblems, encodeClaimProblems } from "@/server/ai/claim-diag
 import { invalidResponse, safeAiFailure } from "@/server/ai/errors";
 import { validationFailure } from "@/server/ai/validation-failures";
 import { reviewResponseSchema } from "@/lib/ai-review/contracts";
-import { containsRequirementPhrase, mentionedTechnologies, proseGroundingProblems } from "@/lib/ai-review/grounding";
+import { containsRequirementPhrase, mentionedTechnologies, proseGroundingProblems } from "@/server/ai/grounding";
 import { validateRewrite } from "@/server/ai/validate";
 import { aiJob, aiQuote, aiResume, validAiReview } from "../fixtures/ai-review";
 
